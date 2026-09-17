@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.liuyao/schemas/liuyao-chart-schema-v0.1.json",
+  "title": "Liuyao Chart v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "ruleVersion",
+    "casting",
+    "timeContext",
+    "primaryHexagram",
+    "changedHexagram",
+    "changingLines",
+    "primaryLines",
+    "changedLines"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "liuyao-chart-schema-v0.1" },
+    "ruleVersion": { "const": "liuyao-chart-v0.1" },
+    "casting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "lineOrder", "values"],
+      "properties": {
+        "method": { "enum": ["three_coins", "simulated_three_coins", "manual"] },
+        "lineOrder": { "const": "bottom_to_top" },
+        "values": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": { "enum": [6, 7, 8, 9] }
+        }
+      }
+    },
+    "timeContext": { "$ref": "#/$defs/timeContext" },
+    "primaryHexagram": { "$ref": "#/$defs/hexagram" },
+    "changedHexagram": { "$ref": "#/$defs/hexagram" },
+    "changingLines": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "integer", "minimum": 1, "maximum": 6 }
+    },
+    "primaryLines": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/primaryLine" }
+    },
+    "changedLines": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/changedLine" }
+    }
+  },
+  "$defs": {
+    "branch": { "enum": ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"] },
+    "stem": { "enum": ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"] },
+    "element": { "enum": ["wood", "fire", "earth", "metal", "water"] },
+    "relative": { "enum": ["siblings", "offspring", "parents", "wealth", "officials"] },
+    "spirit": { "enum": ["青龙", "朱雀", "勾陈", "螣蛇", "白虎", "玄武"] },
+    "binary": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "enum": [0, 1] }
+    },
+    "timeContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["castAt", "timezone", "calendarRuleVersion", "dayBoundary", "monthBranch", "dayStem", "dayBranch", "voidBranches"],
+      "properties": {
+        "castAt": { "type": "string", "format": "date-time" },
+        "timezone": { "type": "string", "minLength": 1 },
+        "calendarRuleVersion": { "const": "sexagenary-calendar-v0.1" },
+        "dayBoundary": { "const": "midnight" },
+        "monthBranch": { "$ref": "#/$defs/branch" },
+        "dayStem": { "$ref": "#/$defs/stem" },
+        "dayBranch": { "$ref": "#/$defs/branch" },
+        "voidBranches": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/branch" }
+        }
+      }
+    },
+    "hexagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kingWenNumber", "name", "upperTrigram", "lowerTrigram", "binary", "palace", "palaceElement", "palaceStage", "selfLine", "responseLine"],
+      "properties": {
+        "kingWenNumber": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "name": { "type": "string", "minLength": 1 },
+        "upperTrigram": { "enum": ["乾", "兑", "离", "震", "巽", "坎", "艮", "坤"] },
+        "lowerTrigram": { "enum": ["乾", "兑", "离", "震", "巽", "坎", "艮", "坤"] },
+        "binary": { "$ref": "#/$defs/binary" },
+        "palace": { "enum": ["乾", "兑", "离", "震", "巽", "坎", "艮", "坤"] },
+        "palaceElement": { "$ref": "#/$defs/element" },
+        "palaceStage": { "enum": ["pure", "first", "second", "third", "fourth", "fifth", "wandering", "returning"] },
+        "selfLine": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "responseLine": { "type": "integer", "minimum": 1, "maximum": 6 }
+      }
+    },
+    "primaryLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["position", "castingValue", "yinYang", "moving", "stem", "branch", "element", "relative", "spirit", "isSelf", "isResponse", "isVoid"],
+      "properties": {
+        "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "castingValue": { "enum": [6, 7, 8, 9] },
+        "yinYang": { "enum": ["yin", "yang"] },
+        "moving": { "type": "boolean" },
+        "stem": { "$ref": "#/$defs/stem" },
+        "branch": { "$ref": "#/$defs/branch" },
+        "element": { "$ref": "#/$defs/element" },
+        "relative": { "$ref": "#/$defs/relative" },
+        "spirit": { "$ref": "#/$defs/spirit" },
+        "isSelf": { "type": "boolean" },
+        "isResponse": { "type": "boolean" },
+        "isVoid": { "type": "boolean" }
+      }
+    },
+    "changedLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["position", "yinYang", "sourceWasMoving", "stem", "branch", "element", "relative", "spirit", "sourceWasSelf", "sourceWasResponse", "isVoid"],
+      "properties": {
+        "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "yinYang": { "enum": ["yin", "yang"] },
+        "sourceWasMoving": { "type": "boolean" },
+        "stem": { "$ref": "#/$defs/stem" },
+        "branch": { "$ref": "#/$defs/branch" },
+        "element": { "$ref": "#/$defs/element" },
+        "relative": { "$ref": "#/$defs/relative" },
+        "spirit": { "$ref": "#/$defs/spirit" },
+        "sourceWasSelf": { "type": "boolean" },
+        "sourceWasResponse": { "type": "boolean" },
+        "isVoid": { "type": "boolean" }
+      }
+    }
+  }
+}

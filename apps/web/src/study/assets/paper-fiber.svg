@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
+  <defs>
+    <filter id="fiber" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".52 .075" numOctaves="3" seed="37" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncR type="linear" slope=".18" intercept=".77"/><feFuncG type="linear" slope=".17" intercept=".72"/><feFuncB type="linear" slope=".16" intercept=".61"/></feComponentTransfer>
+    </filter>
+    <filter id="cloud" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".009" numOctaves="3" seed="13" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+  </defs>
+  <path fill="#e4d7b7" d="M0 0h768v1024H0z"/>
+  <path filter="url(#fiber)" d="M0 0h768v1024H0z"/>
+  <path filter="url(#cloud)" opacity=".065" style="mix-blend-mode:multiply" d="M0 0h768v1024H0z"/>
+</svg>

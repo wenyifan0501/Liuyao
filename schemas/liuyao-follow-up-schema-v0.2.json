@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.liuyao/schemas/liuyao-follow-up-schema-v0.2.json",
+  "title": "Liuyao Follow-up v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "consultationId", "chartId", "scope", "reason", "answer", "citedLines", "citedFactIds", "conversationSummary", "confirmedFacts", "nextQuestion"],
+  "properties": {
+    "version": { "const": "liuyao-follow-up-v0.2" },
+    "consultationId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "chartId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "scope": { "enum": ["same_consultation", "new_consultation", "needs_clarification"] },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "answer": { "type": "string", "minLength": 1, "maxLength": 8000 },
+    "citedLines": { "type": "array", "uniqueItems": true, "maxItems": 6, "items": { "type": "integer", "minimum": 1, "maximum": 6 } },
+    "citedFactIds": { "type": "array", "uniqueItems": true, "maxItems": 12, "items": { "type": "string", "minLength": 1, "maxLength": 100 } },
+    "conversationSummary": { "type": "string", "minLength": 1, "maxLength": 3000 },
+    "confirmedFacts": { "type": "array", "uniqueItems": true, "maxItems": 20, "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+    "nextQuestion": { "anyOf": [{ "type": "string", "minLength": 5, "maxLength": 800 }, { "type": "null" }] }
+  }
+}

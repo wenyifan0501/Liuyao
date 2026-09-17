@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.liuyao/schemas/liuyao-interpretation-schema-v0.1.json",
+  "title": "Liuyao Interpretation v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "analysisVersion",
+    "chartId",
+    "chartRuleVersion",
+    "question",
+    "anchors",
+    "evidence",
+    "judgment",
+    "timingCandidates",
+    "actionAdvice",
+    "validationQuestions",
+    "safetyNotes"
+  ],
+  "properties": {
+    "analysisVersion": { "const": "liuyao-interpretation-v0.1" },
+    "chartId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "chartRuleVersion": { "const": "liuyao-chart-v0.1" },
+    "question": { "$ref": "#/$defs/question" },
+    "anchors": { "$ref": "#/$defs/anchors" },
+    "evidence": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/evidence" }
+    },
+    "judgment": { "$ref": "#/$defs/judgment" },
+    "timingCandidates": {
+      "type": "array",
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/timingCandidate" }
+    },
+    "actionAdvice": { "$ref": "#/$defs/shortTextList" },
+    "validationQuestions": {
+      "type": "array",
+      "maxItems": 2,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+    },
+    "safetyNotes": { "$ref": "#/$defs/shortTextList" }
+  },
+  "$defs": {
+    "relative": { "enum": ["siblings", "offspring", "parents", "wealth", "officials"] },
+    "lineNumber": { "type": "integer", "minimum": 1, "maximum": 6 },
+    "shortTextList": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topic", "normalizedQuestion", "timeWindow"],
+      "properties": {
+        "topic": {
+          "enum": [
+            "daily", "career", "exam", "finance", "relationship", "cooperation",
+            "travel", "lost_property", "health_tendency", "market_trend", "other"
+          ]
+        },
+        "normalizedQuestion": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "timeWindow": {
+          "anyOf": [
+            { "type": "string", "minLength": 1, "maxLength": 300 },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "usefulGod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative", "line", "reason"],
+      "properties": {
+        "relative": { "$ref": "#/$defs/relative" },
+        "line": { "$ref": "#/$defs/lineNumber" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "secondaryAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "line", "reason"],
+      "properties": {
+        "kind": { "enum": ["self", "response", "counterpart", "document", "income", "other"] },
+        "line": { "$ref": "#/$defs/lineNumber" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "anchors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selfLine", "responseLine", "primaryUsefulGod", "usefulGodCandidates", "secondaryAnchors"],
+      "properties": {
+        "selfLine": { "$ref": "#/$defs/lineNumber" },
+        "responseLine": { "$ref": "#/$defs/lineNumber" },
+        "primaryUsefulGod": {
+          "anyOf": [
+            { "$ref": "#/$defs/usefulGod" },
+            { "type": "null" }
+          ]
+        },
+        "usefulGodCandidates": {
+          "type": "array",
+          "maxItems": 6,
+          "items": { "$ref": "#/$defs/usefulGod" }
+        },
+        "secondaryAnchors": {
+          "type": "array",
+          "maxItems": 6,
+          "items": { "$ref": "#/$defs/secondaryAnchor" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "line", "effect", "fact", "reason"],
+      "properties": {
+        "source": { "enum": ["line", "month", "day", "change", "context"] },
+        "line": {
+          "anyOf": [
+            { "$ref": "#/$defs/lineNumber" },
+            { "type": "null" }
+          ]
+        },
+        "effect": { "enum": ["supporting", "weakening", "ambiguous"] },
+        "fact": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "judgment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tendency", "summary", "conditions", "confidence", "uncertainties"],
+      "properties": {
+        "tendency": {
+          "enum": ["favorable", "mixed_favorable", "neutral_uncertain", "mixed_unfavorable", "unfavorable"]
+        },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "conditions": { "$ref": "#/$defs/shortTextList" },
+        "confidence": { "enum": ["low", "medium", "high"] },
+        "uncertainties": { "$ref": "#/$defs/shortTextList" }
+      }
+    },
+    "timingCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window", "basis", "certainty"],
+      "properties": {
+        "window": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "basis": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "certainty": { "enum": ["low", "medium"] }
+      }
+    }
+  }
+}
