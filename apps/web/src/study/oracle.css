@@ -1,0 +1,156 @@
+/* Per-method identity: each way of asking has its own object, result sheet and conversation tone. */
+.study{--m-liuyao:#c9ab72;--m-meihua:#d99aa5;--m-qiuqian:#d4674c;--m-jiaobei:#d98a55}
+
+/* ── Desk station ── */
+.oracle-station-qiuqian{left:44%;top:50%;width:230px;height:290px}
+.oracle-station-jiaobei{left:44%;top:58%;width:330px;height:200px}
+.oracle-station-meihua{left:44%;top:52%;width:300px;height:250px}
+.oracle-station .oracle-object-target{border-radius:40%}
+.oracle-station.is-charging .oracle-object-target{cursor:grabbing}
+.oracle-station:not(.is-idle) .oracle-object-target{outline:none!important;box-shadow:none!important}
+.oracle-caption{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);margin:0;white-space:nowrap;pointer-events:none;font:13px/1.6 "KaiTi","STKaiti",serif;letter-spacing:4px;color:#f0dfba;text-shadow:0 1px 8px #000c;text-align:center;animation:letter-ink .5s both}
+.oracle-progress{display:block;width:150px;height:2px;margin:8px auto 0;background:#f0dfba33;border-radius:2px;overflow:hidden}.oracle-progress i{display:block;height:100%;background:var(--m-qiuqian);box-shadow:0 0 8px var(--m-qiuqian);transition:width .12s}
+.oracle-station-jiaobei.is-charging .oracle-caption{color:#ffe0bf;text-shadow:0 0 14px #d98a5599,0 1px 8px #000c}
+.meihua-slip{
+  position:absolute;left:50%;top:50%;width:330px;transform:translate(-50%,-50%) rotate(-1deg);
+  padding:28px 26px 24px;isolation:isolate;background:transparent;border:0;color:#493c29;color-scheme:light;
+  box-shadow:none;filter:drop-shadow(1px 2px 1px #36210c50) drop-shadow(6px 18px 20px #0006);
+}
+.meihua-slip::before,.lot-sheet::before{
+  content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(100deg,#ffffff20,transparent 34%,#987c4b0b),var(--paper-texture) center/100% 100%;
+  background-color:var(--paper-stock);
+  -webkit-mask:var(--paper-edge) center/100% 100% no-repeat;
+  mask:var(--paper-edge) center/100% 100% no-repeat;
+  box-shadow:inset 1px 1px 3px #fffdf3a0,inset -2px -2px 4px #9b805b38;
+}
+.meihua-slip::after{
+  content:'';position:absolute;left:13px;top:25px;bottom:25px;border-left:1px solid #ae6e7650;pointer-events:none;
+}
+.meihua-slip-title{margin:0 0 6px;font:17px "KaiTi","STKaiti",serif;letter-spacing:6px;color:#6e3340}
+.meihua-slip-note{margin:0 0 16px;font-size:12px;line-height:1.7;color:#7a6548}
+.meihua-slip>div:first-of-type{display:flex;gap:10px;margin-bottom:14px}
+.meihua-slip label{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.meihua-slip label span{font-size:11px;letter-spacing:2px;color:#9a5a63}
+.meihua-slip input{width:100%}
+.meihua-slip-actions{display:flex;align-items:center;justify-content:space-between}
+.meihua-slip-cancel{background:none;border:0;color:#8a7356;font-size:12px;cursor:pointer;padding:8px 0}
+.meihua-slip .letter-seal{margin:0;background:#8e3a45;border-color:#b5636f;outline-color:#8e3a45}
+
+/* ── Shared result sheet ── */
+.oracle-result header{margin-bottom:6px}
+.oracle-kicker{display:block;font:11px/2 sans-serif;letter-spacing:3px;color:#a99772}
+.oracle-meta{font-size:12px!important;color:#b5a582;line-height:1.8;margin:14px 0 0}
+.oracle-result details{margin-top:18px}
+
+/* 梅花：卦象与事实账本 */
+.oracle-meihua{--accent:var(--m-meihua)}
+.oracle-meihua h2{font:26px "Songti SC",SimSun,serif;margin:2px 0 0;color:#f1e3c8}.oracle-meihua h2 small{font-size:15px;color:var(--accent);margin:0 6px}
+.oracle-meihua .chart-tabs{margin:16px 0 18px}
+.mh-trio{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:center}
+.mh-trio figure{margin:0}.mh-trio figcaption{font-size:11px;letter-spacing:3px;color:#a99772;margin-bottom:10px}.mh-trio p{margin:10px 0 0;font-size:15px;color:#ead9b6}
+.mh-trio figure:first-child .mh-lines{padding-right:22px}
+.mh-lines{display:flex;flex-direction:column;gap:7px;align-items:center}
+.mh-lines>div{position:relative;display:flex;gap:10px;width:70px}
+.mh-lines>div i{display:block;height:7px;flex:1;background:#d9c08f;border-radius:1px}
+.mh-lines>div.yang i:last-child{display:none}.mh-lines>div.yang i:first-child{flex:none;width:100%}
+.mh-lines>div.moving i{background:var(--accent);box-shadow:0 0 8px #d99aa566}
+.mh-lines em{position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);font:12px "KaiTi",serif;font-style:normal;color:var(--accent);border:1px solid #d99aa566;padding:0 3px;line-height:1.4}
+.mh-relation{display:flex;align-items:center;justify-content:center;gap:18px;margin:22px 0 16px;font-size:13px;color:#c4b28c}
+.mh-relation b{font:20px "KaiTi","STKaiti",serif;color:#f4d9dd;letter-spacing:4px;padding:6px 16px;border:1px solid #d99aa555;border-radius:2px;background:#d99aa512}
+.mh-facts{width:100%;border-collapse:collapse;font-size:13px;color:#dccbaa}
+.mh-facts th{font-weight:400;font-size:11px;letter-spacing:2px;color:#9d8c69;text-align:left;padding:6px 8px;border-bottom:1px solid #a6905a40}
+.mh-facts td{padding:7px 8px;border-bottom:1px solid #a6905a1c;color:#dccbaa}.mh-facts td small{margin-left:5px;color:#9d8c69;font-size:11px}
+.mh-facts tr.is-body td{color:#f4d9dd}.mh-facts tr.is-body td:first-child{color:var(--accent)}
+.mh-facts .state-旺{color:#f0c98a}.mh-facts .state-相{color:#dcc596}.mh-facts .state-休,.mh-facts .state-囚{color:#a99d85}.mh-facts .state-死{color:#8b8170}
+
+/* 求签：签纸 */
+.study-dialog.oracle-result-dialog:has(.oracle-qiuqian){width:min(440px,calc(100vw - 32px))}
+.oracle-qiuqian{--accent:var(--m-qiuqian);text-align:center}
+.lot-sheet{
+  position:relative;isolation:isolate;margin:4px auto 0;width:min(300px,100%);padding:20px 20px 28px;
+  background:transparent;color:#3f2a1b;border:0;box-shadow:none;
+  filter:drop-shadow(1px 2px 1px #1b110970) drop-shadow(0 12px 16px #0006);
+}
+.lot-sheet::after{content:'';position:absolute;inset:9px;border:1px solid #9f3a2a80;outline:1px solid #9f3a2a33;outline-offset:3px;pointer-events:none}
+.lot-head{margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #a8332455;font:16px "KaiTi","STKaiti",serif;letter-spacing:8px;color:#9c2f22}
+.lot-body{writing-mode:vertical-rl;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:14px;height:300px;margin:0 auto}
+.lot-number{margin:0;font:bold 22px "KaiTi","STKaiti",serif;letter-spacing:6px;color:#2f1f12}
+.lot-stems{margin:0;font:13px "KaiTi",serif;color:#7a5a3a;letter-spacing:4px}
+.lot-poem{display:flex;flex-direction:column;gap:10px}.lot-poem p{margin:0;font:21px/1.5 "KaiTi","STKaiti","Songti SC",serif;letter-spacing:7px;color:#2f1f12}
+.lot-stamp{margin:0;writing-mode:horizontal-tb;align-self:flex-end;white-space:nowrap;font:bold 16px "KaiTi",serif;letter-spacing:2px;padding:6px 6px;color:#f5e2c4;background:#a83324;border:1px solid #7c1f15;outline:1px solid #a83324;outline-offset:2px;transform:rotate(-6deg)}
+.lot-stamp.tone-low{background:#5b4a3b;border-color:#3b2e24;outline-color:#5b4a3b}
+.lot-stamp.tone-mid{background:#8b5a2b;border-color:#5d3b1b;outline-color:#8b5a2b}
+.oracle-qiuqian .oracle-meta{text-align:center}
+.oracle-source{display:inline-block;margin-top:6px;font-size:12px;color:#c4a77c}
+.oracle-qiuqian details{text-align:left}
+
+/* 掷筊：筊面 */
+.oracle-jiaobei{--accent:var(--m-jiaobei);text-align:center}
+.jb-figure{display:block;width:min(320px,100%);margin:14px auto 4px}
+.jb-name{font:40px "KaiTi","STKaiti",serif!important;letter-spacing:12px;margin:6px 0 4px!important;color:#f3dcc0}
+.oracle-jiaobei.is-holy .jb-name{color:#f2c27e;text-shadow:0 0 22px #d98a5566}
+.oracle-jiaobei.is-yin .jb-name{color:#b9a58f}
+.jb-meaning{color:#d8c7a6;margin:0 0 18px}
+.jb-legend{list-style:none;padding:0;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:380px}
+.jb-legend li{display:flex;flex-direction:column;gap:2px;padding:10px 4px;border:1px solid #a6905a33;border-radius:3px;color:#9d8c69;font-size:11px}
+.jb-legend li b{font:16px "KaiTi",serif;color:#c9b894;letter-spacing:2px}
+.jb-legend li[aria-current]{border-color:#d98a5599;background:#d98a5514;color:#e6c9a6}.jb-legend li[aria-current] b{color:#f6d6ae}
+.oracle-jiaobei details{text-align:left}
+
+/* ── Side letter summary ── */
+.letter-oracle-summary .mh-lines{align-items:flex-start;gap:5px;margin:6px 0 2px;--accent:#b5636f}
+.letter-oracle-summary .mh-lines>div{width:54px;gap:7px}.letter-oracle-summary .mh-lines>div i{height:5px;background:#6a523a}
+
+/* ── Conversation tone ── */
+.study-conversation{position:relative;--accent:var(--m-liuyao)}
+.study-conversation.method-meihua{--accent:var(--m-meihua)}
+.study-conversation.method-qiuqian{--accent:var(--m-qiuqian)}
+.study-conversation.method-jiaobei{--accent:var(--m-jiaobei)}
+.study-conversation:not(.method-liuyao)::before{position:absolute;right:36px;top:110px;font:170px/1 "KaiTi","STKaiti",serif;color:var(--accent);opacity:.06;pointer-events:none}
+.study-conversation.method-meihua::before{content:'梅'}.study-conversation.method-qiuqian::before{content:'籤'}.study-conversation.method-jiaobei::before{content:'筊'}
+.study-conversation:not(.method-liuyao) .study-eyebrow{color:var(--accent)}
+.study-conversation:not(.method-liuyao) .conversation-result{display:inline-block;margin-top:2px;font:13px "KaiTi","STKaiti",serif;letter-spacing:2px;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px}
+.study-conversation:not(.method-liuyao)>header{border-bottom-color:color-mix(in srgb,var(--accent) 30%,transparent)}
+.study .study-conversation:not(.method-liuyao) .answer-heading{color:var(--accent)}
+.study .study-conversation:not(.method-liuyao) .ai-answer blockquote{border-color:var(--accent)}
+.study .study-conversation:not(.method-liuyao) .ai-answer strong{color:color-mix(in srgb,var(--accent) 45%,#f3e6cc)}
+.study .study-conversation.method-meihua .primary-button{background:#8e4d59;border-color:#b5707c}
+.study .study-conversation.method-qiuqian .primary-button{background:#9c3f2c;border-color:#c0614b}
+.study .study-conversation.method-jiaobei .primary-button{background:#9a5a33;border-color:#c27c4f}
+
+@media(max-width:700px){.oracle-station-qiuqian,.oracle-station-meihua,.oracle-station-jiaobei{left:42%;width:200px;height:220px}.meihua-slip{width:min(300px,calc(100vw - 40px))}.mh-trio{gap:8px}.mh-lines>div{width:56px}.lot-body{height:260px}.lot-poem p{font-size:18px}.jb-name{font-size:32px!important}}
+@media(prefers-reduced-motion:reduce){.oracle-caption{animation:none}.oracle-progress i{transition:none}}
+
+/* ── Warmer room: the edges fade into a lamp-lit study instead of black ── */
+.study{background:#2e241b}
+.study .study-vignette{background:radial-gradient(ellipse at 46% 46%,transparent 48%,#2a1c1022 66%,#1a110a8c 88%,#120b06c4 100%),linear-gradient(0deg,#120b0666 0%,transparent 14%,transparent 90%,#120b0659 100%)}
+.letter-choosing{display:block;margin-top:18px;padding-top:16px;border-top:1px solid #8d724b33;font:12px "KaiTi","STKaiti",serif!important;letter-spacing:4px;color:#8f5a3e!important}
+.letter-sign small{margin-right:auto;font:12px "KaiTi","STKaiti",serif;letter-spacing:2px;color:#8b7356}
+
+/* ── Choosing a method on the desk ── */
+.method-stage{position:absolute;inset:0;touch-action:pan-y;cursor:grab;outline:none;user-select:none}
+.method-stage:active{cursor:grabbing}
+.method-stage:focus-visible .method-confirm{outline:2px solid #f0d49c;outline-offset:4px}
+.method-hint{margin:12px 0 0;font:12px/1.6 "KaiTi","STKaiti",serif;letter-spacing:4px;color:#e9d6b2b3;animation:letter-ink .6s .3s both}
+.method-side{position:absolute;top:47%;transform:translateY(-50%);display:flex;align-items:center;gap:8px;padding:12px 14px;border:0;border-radius:3px;background:#1d140c55;color:#ead6b0;font:14px "KaiTi","STKaiti",serif;letter-spacing:3px;cursor:pointer;opacity:.72;transition:opacity .2s,background .2s,transform .2s}
+.method-side:hover,.method-side:focus-visible{opacity:1;background:#3b2a1a99;outline:none}
+.method-prev{left:3%}.method-next{right:26%}
+.method-prev:hover{transform:translate(-3px,-50%)}.method-next:hover{transform:translate(3px,-50%)}
+.method-panel{position:absolute;left:46%;bottom:3.5%;transform:translateX(-50%);width:min(560px,62vw);padding:22px 40px 16px;text-align:center;pointer-events:none;background:radial-gradient(ellipse 50% 50% at 50% 50%,#1c120bc4 0%,#1c120b8c 50%,#1c120b33 78%,#1c120b00 100%)}
+.method-panel button{pointer-events:auto}
+.method-card{padding:4px 0 12px;animation:method-card .42s cubic-bezier(.2,.75,.25,1) both}
+.method-card[data-direction="-1"]{animation-name:method-card-back}
+.method-card h2{margin:4px 0 8px;font:34px/1.3 "KaiTi","STKaiti",serif;letter-spacing:10px;color:#f8ead0;text-shadow:0 2px 16px #000c}
+.method-card p{margin:0 auto;max-width:380px;font:14px/1.9 "Songti SC",SimSun,serif;color:#e4d2b0;text-shadow:0 1px 8px #000d}
+.method-kicker{font:12px "KaiTi","STKaiti",serif;letter-spacing:6px;color:#e8b98a;text-shadow:0 1px 8px #000c}
+.method-dots{display:flex;justify-content:center;gap:9px;margin:4px 0 16px}
+.method-dots i{width:6px;height:6px;border-radius:50%;background:#e9d4ac55;transition:background .25s,transform .25s}
+.method-dots i.is-current{background:#f2c983;transform:scale(1.35);box-shadow:0 0 8px #f2c98399}
+.method-actions{display:flex;align-items:center;justify-content:center;gap:22px}
+.method-back{border:0;background:none;color:#d9c49e;font:13px "KaiTi","STKaiti",serif;letter-spacing:3px;cursor:pointer;padding:10px 4px;text-shadow:0 1px 6px #000c}
+.method-back:hover{color:#fff1d6}
+.study .method-confirm{min-width:200px}
+@keyframes method-card{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes method-card-back{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.method-card,.method-hint{animation:none}.method-side{transition:none}}

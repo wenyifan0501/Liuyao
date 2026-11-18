@@ -62,7 +62,7 @@ async function main(): Promise<void> {
   if (!apiKey) throw new Error("缺少 DEEPSEEK_API_KEY");
   const sourcePath = process.argv[2] ? resolve(process.argv[2]) : await latestSessionPath();
   const { question, chart } = getInputs(parseEvents(await readFile(sourcePath, "utf8")));
-  const rawSkill = await loadRawSkill(join(process.cwd(), "Skill"));
+  const rawSkill = await loadRawSkill(join(process.cwd(), "Skill", "liuyao"));
   const experimentId = `raw-${randomUUID()}`;
   const logger = new JsonlSessionLogger({
     sessionId: experimentId,

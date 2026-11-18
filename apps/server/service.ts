@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import {meihua,qiuqian,jiaobei} from "../../src/divination/oracles.js";
+import { randomInt, randomUUID } from "node:crypto";
 import type { Database, Queryable } from "./database.js";
 import { digest, passwordHash, secret, ServiceError, verifyPassword } from "./security.js";
 import { buildChart } from "../../src/domain/engine.js";
@@ -7,6 +8,7 @@ import { resolveCalendarContext } from "../../src/calendar/lunarCalendar.js";
 import type { CastConsultation, ConsultationView, CreateConsultation, TrialView } from "../../packages/contracts/index.js";
 
 interface ConsultationRow extends Record<string, unknown> {
+  method: ConsultationView["method"]; oracle: ConsultationView["oracle"];
   id: string; question: string; topic: ConsultationView["topic"]; background: string[];
   time_window: string | null; timezone: string; status: ConsultationView["status"];
   chart: ConsultationView["chart"]; created_at: Date | string;
@@ -14,7 +16,7 @@ interface ConsultationRow extends Record<string, unknown> {
   request_hash: string; cast_request_hash: string | null;
 }
 const view = (row: ConsultationRow): ConsultationView => ({
-  favorite: row.favorite, id: row.id, question: row.question, topic: row.topic, background: row.background,
+  method:row.method ?? "liuyao", oracle:row.oracle ?? null, favorite: row.favorite, id: row.id, question: row.question, topic: row.topic, background: row.background,
   timeWindow: row.time_window, timezone: row.timezone, status: row.status,
   chart: row.chart, createdAt: new Date(row.created_at).toISOString(),
 });
@@ -23,7 +25,9 @@ const notFound = (): never => { throw new ServiceError(404, "not_found", "咨询
 
 export class ConsultationService {
   private readonly dummyPassword = passwordHash(secret());
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Database, private readonly quota: { enforced?: boolean } = {}) {}
+
+  private get enforced(): boolean { return this.quota.enforced !== false; }
 
   async createInvitation(trials: number, followUps: number, days = 7): Promise<string> {
     if (![trials, followUps].every((n) => Number.isInteger(n) && n >= 0 && n <= 20) || !Number.isInteger(days) || days < 1 || days > 30) {
@@ -77,18 +81,20 @@ export class ConsultationService {
     const result = await this.db.query<{ available: number; follow_ups_per_consultation: number }>("SELECT available,follow_ups_per_consultation FROM trial_accounts WHERE user_id=$1", [userId]);
     const account = result.rows[0];
     if (!account) throw new ServiceError(401, "unauthorized", "账户不存在");
+    if (!this.enforced) return { remainingConsultations: null, followUpsPerConsultation: null };
     return { remainingConsultations: account.available, followUpsPerConsultation: account.follow_ups_per_consultation };
   }
 
   async create(userId: string, key: string, input: CreateConsultation): Promise<ConsultationView> {
     try { new Intl.DateTimeFormat("en", { timeZone: input.timezone }); }
     catch { throw new ServiceError(400, "invalid_timezone", "时区无效"); }
-    const normalized = { question: input.question.trim(), topic: input.topic, background: input.background.map((x) => x.trim()).filter(Boolean), timeWindow: input.timeWindow?.trim() || null, timezone: input.timezone };
+    const normalized = { method:input.method ?? "liuyao", question: input.question.trim(), topic: input.topic, background: input.background.map((x) => x.trim()).filter(Boolean), timeWindow: input.timeWindow?.trim() || null, timezone: input.timezone };
     if (!normalized.question) throw new ServiceError(400, "question_required", "请输入占问问题");
-    const hash = digest(JSON.stringify(normalized));
+    const {method: selectedMethod,...legacyInput}=normalized;
+    const hash = digest(JSON.stringify(selectedMethod==='liuyao'?legacyInput:normalized));
     return this.db.transaction(async (tx) => {
-      await tx.query("INSERT INTO consultations(id,owner_id,request_key,request_hash,question,topic,background,time_window,timezone) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9) ON CONFLICT(owner_id,request_key) DO NOTHING",
-        [randomUUID(), userId, key, hash, normalized.question, normalized.topic, JSON.stringify(normalized.background), normalized.timeWindow, normalized.timezone]);
+      await tx.query("INSERT INTO consultations(id,owner_id,request_key,request_hash,question,topic,background,time_window,timezone,method) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10) ON CONFLICT(owner_id,request_key) DO NOTHING",
+        [randomUUID(), userId, key, hash, normalized.question, normalized.topic, JSON.stringify(normalized.background), normalized.timeWindow, normalized.timezone,normalized.method]);
       const result = await tx.query<ConsultationRow>("SELECT * FROM consultations WHERE owner_id=$1 AND request_key=$2", [userId, key]);
       const row = result.rows[0]!;
       if (row.deleted_at) notFound();
@@ -105,6 +111,23 @@ export class ConsultationService {
   async get(userId: string, id: string): Promise<ConsultationView> {
     const result = await this.db.query<ConsultationRow>("SELECT * FROM consultations WHERE owner_id=$1 AND id=$2 AND deleted_at IS NULL", [userId, id]);
     return view(result.rows[0] ?? notFound());
+  }
+
+  async oracle(userId:string,id:string,numbers?:number[]):Promise<ConsultationView>{
+    return this.db.transaction(async tx=>{
+      const rows=await tx.query<ConsultationRow>("SELECT * FROM consultations WHERE owner_id=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE",[userId,id]);
+      const row=rows.rows[0] ?? notFound();
+      if(row.method==='liuyao')throw new ServiceError(400,'wrong_method','六爻请使用摇钱起卦');
+      if(row.oracle)return view(row);
+      const runs=await tx.query("SELECT id FROM ai_runs WHERE consultation_id=$1 AND status IN ('queued','running')",[id]);
+      if(runs.rows.length)throw new ServiceError(409,'generation_active','请等待当前解读完成');
+      let result;
+      if(row.method==='meihua'){try{const cal=resolveCalendarContext({castAt:new Date().toISOString(),timezone:row.timezone});result=meihua(numbers ?? [],{castAt:cal.castAt,timezone:cal.timezone,monthBranch:cal.monthBranch});}catch{throw new ServiceError(400,'invalid_numbers','请输入三个有效正整数');}}
+      else if(row.method==='qiuqian')result=qiuqian(randomInt(100));
+      else result=jiaobei(randomInt(2),randomInt(2));
+      const updated=await tx.query<ConsultationRow>("UPDATE consultations SET oracle=$3::jsonb,status='chart_ready' WHERE owner_id=$1 AND id=$2 RETURNING *",[userId,id,JSON.stringify(result)]);
+      return view(updated.rows[0]!);
+    });
   }
 
   async favorite(userId: string, id: string, favorite: boolean): Promise<ConsultationView> {
@@ -133,6 +156,7 @@ export class ConsultationService {
     return this.db.transaction(async (tx) => {
       const result = await tx.query<ConsultationRow>("SELECT * FROM consultations WHERE owner_id=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE", [userId, id]);
       const row = result.rows[0] ?? notFound();
+      if(row.method!=="liuyao") throw new ServiceError(400,"wrong_method","请使用该问事对应的起卦方式");
       if (row.chart) {
         if (row.cast_request_hash !== hash) conflict();
         return view(row);

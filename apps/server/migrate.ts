@@ -6,7 +6,7 @@ export async function migrate(db: Database): Promise<void> {
     // Serialize migration processes before creating or reading the version table.
     await tx.query("SELECT pg_advisory_xact_lock(78213460)");
     await tx.query("CREATE TABLE IF NOT EXISTS schema_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())");
-    for (const [index, filename] of ["001-foundation.sql", "002-ai-runs.sql", "003-consultation-library.sql"].entries()) {
+    for (const [index, filename] of ["001-foundation.sql", "002-ai-runs.sql", "003-consultation-library.sql", "004-divination-methods.sql"].entries()) {
       const version = index + 1;
       const applied = await tx.query("SELECT version FROM schema_migrations WHERE version=$1", [version]);
       if (applied.rows.length) continue;

@@ -21,3 +21,9 @@ Existing paper/stone illustrations and walnut texture remain local. The yellow u
 ## Object material refinement (2026-09-17)
 
 objectSurfaces.ts generates original seeded 512px pigment, bump and roughness maps for linen, paper, bamboo, slate, soapstone and celadon glaze. DeskObjects.tsx adds a recessed ink well, curved saucer, shaped brush tuft with individual strands, and a pierced stone seal handle. No external assets or runtime services are used. TurtleShell.tsx and the yellow underlay are unchanged.
+
+## Desk and mat (2026-10-27)
+
+- `walnut-albedo.jpg` removed: the desk is now the Blender table `public/models/desk.glb` (`scripts/blender/desk.py`), with its own procedural rosewood maps and a brass key-fret inlay.
+- `mat-brocade.webp`: indigo silk brocade mat with a silver cloud-scroll border, generated with the built-in image model as a flat top-down textile (prompt in `.workbuddy/memory/2026-10-27.md`), cropped 19 px on each side to remove the white margin, 1024×1024 WebP q86. The woven relief normal map is derived from its luminance at runtime (`DeskMat.tsx`).
+- `paper-sheet.webp`: Blender-rendered Xuan sheet (`scripts/blender/paper.py`). `paper-fiber.svg` stays only as a fallback for older CSS.

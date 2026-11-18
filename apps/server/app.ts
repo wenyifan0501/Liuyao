@@ -14,7 +14,7 @@ const credentials = { username: { ...text(32, 3), pattern: "^[a-zA-Z0-9_]+$" }, 
 const params = object({ id: { type: "string", format: "uuid" } }, ["id"]);
 const topics = ["daily", "career", "exam", "finance", "relationship", "cooperation", "travel", "lost_property", "health_tendency", "market_trend", "other"];
 
-export async function createApp(db: Database, options: { origin: string; secureCookies: boolean; logger?: boolean; ai?: WebAi }) {
+export async function createApp(db: Database, options: { origin: string; secureCookies: boolean; logger?: boolean; ai?: WebAi; quotaEnforced?: boolean }) {
   const origin = new URL(options.origin).origin;
   if (options.secureCookies && !origin.startsWith("https://")) throw new Error("生产环境 APP_ORIGIN 必须使用 HTTPS");
   const app = Fastify({
@@ -23,7 +23,7 @@ export async function createApp(db: Database, options: { origin: string; secureC
     trustProxy: false,
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false } },
   });
-  const service = new ConsultationService(db);
+  const service = new ConsultationService(db, { enforced: options.quotaEnforced ?? true });
   const aiReader = options.ai ?? new WebAi(db, { model: "disabled", skillHash: "", async execute() { throw new Error("AI disabled"); } });
   await app.register(cookie);
   await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
@@ -72,7 +72,7 @@ export async function createApp(db: Database, options: { origin: string; secureC
   });
   app.post<{ Body: CreateConsultation }>("/api/consultations", {
     config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
-    schema: { body: object({ question: text(2000), topic: { type: "string", enum: topics }, background: { type: "array", maxItems: 10, items: text(1000) }, timeWindow: { anyOf: [text(120), { type: "null" }] }, timezone: text(80) }, ["question", "topic", "background", "timeWindow", "timezone"]) },
+    schema: { body: object({ method:{type:"string",enum:["liuyao","meihua","qiuqian","jiaobei"]}, question: text(2000), topic: { type: "string", enum: topics }, background: { type: "array", maxItems: 10, items: text(1000) }, timeWindow: { anyOf: [text(120), { type: "null" }] }, timezone: text(80) }, ["question", "topic", "background", "timeWindow", "timezone"]) },
   }, async (request, reply) => {
     const user = await service.authenticate(request.cookies.liuyao_session);
     const key = request.headers["idempotency-key"];
@@ -88,6 +88,10 @@ export async function createApp(db: Database, options: { origin: string; secureC
   app.get<{ Params: { id: string } }>("/api/consultations/:id", { schema: { params } }, async (request) => {
     const user = await service.authenticate(request.cookies.liuyao_session);
     return service.get(user.id, request.params.id);
+  });
+  app.post<{Params:{id:string};Body:{numbers?:number[]}}>("/api/consultations/:id/oracle",{schema:{params,body:object({numbers:{type:'array',minItems:3,maxItems:3,items:{type:'integer',minimum:1,maximum:999999999}}},[])}},async request=>{
+    const user=await service.authenticate(request.cookies.liuyao_session);
+    return service.oracle(user.id,request.params.id,request.body.numbers);
   });
   app.post<{Params:{id:string};Body:{favorite:boolean}}>("/api/consultations/:id/favorite", {schema:{params,body:object({favorite:{type:"boolean"}},["favorite"])}}, async request=>{
     const user=await service.authenticate(request.cookies.liuyao_session);

@@ -1,10 +1,13 @@
+import {METHOD_NAMES,type DivinationMethod} from '../../../../packages/contracts';
 import { GatheringLight } from './GatheringLight';
+import { lotGrade } from './OracleResult';
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import type { ConsultationView } from '../../../../packages/contracts';
 
 /** One persistent sheet: only its position and contents change, never a dialog. */
-export function QuestionPaper({ stage, current, question, setQuestion, values, busy, error, open, close, submit, chart }: {
+export function QuestionPaper({ method,choosing=false,stage, current, question, setQuestion, values, busy, error, open, close, submit, chart }: {
+  method:DivinationMethod;choosing?:boolean;
   stage: 'rest' | 'write' | 'side'; current: ConsultationView | null;
   question: string; setQuestion: (value: string) => void; values: readonly number[];
   busy: boolean; error: string; open: () => void; close: () => void;
@@ -19,7 +22,7 @@ export function QuestionPaper({ stage, current, question, setQuestion, values, b
   }, [stage, current]);
   return <>
     <div className={`letter-weight weight-${stage}`} aria-hidden="true"/>
-    <section className={`letter-paper letter-${stage}`} aria-label="问事信笺" onKeyDown={e => { if (e.key === 'Escape' && !busy) close(); }}>
+    <section className={`letter-paper letter-${stage}`} data-method={method} aria-label="问事信笺" onKeyDown={e => { if (e.key === 'Escape' && !busy) close(); }}>
       <div className="letter-grain" aria-hidden="true"/>
       {stage === 'rest' && <button className="letter-open" aria-label="拿起信笺，写下所问之事" onClick={open} disabled={busy}><GatheringLight/><span className="letter-watermark" aria-hidden="true">问</span></button>}
       {stage === 'write' && <div className="letter-content">
@@ -28,10 +31,10 @@ export function QuestionPaper({ stage, current, question, setQuestion, values, b
           <label className="sr-only" htmlFor="letter-question">写下所问之事</label>
           <textarea id="letter-question" ref={input} required maxLength={2000} value={question} onChange={e => setQuestion(e.target.value)} placeholder="此刻，你想问什么？" disabled={busy}/>
           {error && <p role="alert" className="letter-error">{error}</p>}
-          <div className="letter-sign"><span/><button type="submit" className="letter-seal" disabled={busy || !question.trim()} aria-label="落印收笔，留存问题并起卦">{busy ? '稍候' : '问卦'}</button></div>
+          <div className="letter-sign"><span/><small>收笔后，在桌上择一法问之</small><button type="submit" className="letter-seal" disabled={busy || !question.trim()} aria-label="落印收笔，然后在桌上选择问事方式">{busy ? '稍候' : '收笔'}</button></div>
         </form>}
       </div>}
-      {stage === 'side' && <div className="letter-summary"><span>今 日 所 问</span><button className="letter-question-link" onClick={open} disabled={busy}>{current?.question ?? question}</button><div className="study-hexagram" aria-label={`已完成 ${values.length} 爻`}>{Array.from({length:6},(_,j) => { const i=5-j,v=values[i]; return <div className={`study-line ${v ? 'is-drawn' : ''}`} key={i}><span className="study-line-index">{['初','二','三','四','五','上'][i]}</span><div className={v && v%2===0 ? 'yin' : 'yang'}><i/><i/></div><small>{v===6?'×':v===9?'○':''}</small></div>; })}</div><small>{current?.chart?.primaryHexagram.name ?? `${values.length} / 6 爻已成`}</small>{current?.chart && <button className="study-paper-link" onClick={chart}>展开卦盘 ↗</button>}</div>}
+      {stage === 'side' && <div className="letter-summary"><span>今 日 所 问</span><button className="letter-question-link" onClick={open} disabled={busy}>{current?.question ?? question}</button>{choosing && !current ? <small className="letter-choosing">待 择 问 法</small> : current?.oracle ? <div className="letter-oracle-summary"><small>{METHOD_NAMES[method]}</small><button onClick={chart}>{current.oracle.method==='meihua'?`${current.oracle.primary} → ${current.oracle.changed}`:current.oracle.method==='qiuqian'?`第 ${current.oracle.number} 签 · ${lotGrade(current.oracle).grade}`:current.oracle.name}</button>{current.oracle.method==='meihua'&&<p>体{current.oracle.body} · 用{current.oracle.use} · {current.oracle.relation}</p>}{current.oracle.method==='qiuqian'&&current.oracle.poem.map((line,i)=><p key={i}>{line}</p>)}{current.oracle.method==='jiaobei'&&<p>{current.oracle.faces.map(f=>f==='flat'?'平':'凸').join(' · ')}　{current.oracle.meaning}</p>}<button className="study-paper-link" onClick={chart}>展开 ↗</button></div> : method==='liuyao' ? <><div className="study-hexagram" aria-label={`已完成 ${values.length} 爻`}>{Array.from({length:6},(_,j) => { const i=5-j,v=values[i]; return <div className={`study-line ${v ? 'is-drawn' : ''}`} key={i}><span className="study-line-index">{['初','二','三','四','五','上'][i]}</span><div className={v && v%2===0 ? 'yin' : 'yang'}><i/><i/></div><small>{v===6?'×':v===9?'○':''}</small></div>; })}</div><small>{current?.chart?.primaryHexagram.name ?? `${values.length} / 6 爻已成`}</small>{current?.chart && <button className="study-paper-link" onClick={chart}>展开卦盘 ↗</button>}</> : <small>{METHOD_NAMES[method]}</small>}</div>}
     </section>
   </>;
 }

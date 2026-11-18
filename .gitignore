@@ -10,3 +10,6 @@ logs/
 .vercel/
 .DS_Store
 Thumbs.db
+
+# Local agent notes and session records (not for publishing)
+.workbuddy/

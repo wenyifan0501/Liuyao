@@ -1,67 +1,23 @@
+import {OracleTool,type OracleMotion,type OraclePhase} from './OracleTool';
+import type {DivinationMethod,OracleResult} from '../../../../packages/contracts';
 import { TurtleShell, shellSurface } from './TurtleShell';
 import { DeskObjects } from './DeskObjects';
-import { Candle } from './Candle';
+import { DeskLamp } from './DeskLamp';
+import { MethodCarousel, type MethodTrack } from './MethodCarousel';
 import { settledCoinValue, coinValueAtDeadline, COIN_SETTLE_LIMIT_MS, COIN_CONTACT_DAMPING, contactDecay } from './coinSettlement';
 import { ShellOutline } from './ShellOutline';
-import { useEffect, useMemo, useRef, type RefObject } from "react";
-import { useFrame, useLoader, useThree } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef, type RefObject } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { CuboidCollider, CylinderCollider, Physics, RigidBody, useAfterPhysicsStep, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import type { ShakeGesture } from "./gesture";
 import { Arrival } from "./Arrival";
-import { surfaceDetail } from "./materials";
-import walnutUrl from "./assets/walnut-albedo.jpg";
+import { Coin, useCoinAssets, type CoinAssets } from "./Coin";
+import { Model, SceneEnvironment, type Tune } from "./models";
+import { DeskMat } from "./DeskMat";
 
 
-// Assets are bundled locally; no external requests while using the scene.
-function texture(kind: "shell" | "coin") {
-  const canvas = document.createElement("canvas"); canvas.width = canvas.height = 1024;
-  const c = canvas.getContext("2d")!;
-  let seed = 193;
-  const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-  c.fillStyle = kind === "shell" ? "#64513a" : "#ac8840"; c.fillRect(0, 0, 1024, 1024);
-  for (let i = 0; i < 18000; i++) {
-    c.fillStyle = `rgba(${random() > .5 ? "169,128,82" : "24,17,10"},${random() * .16})`;
-    c.fillRect(random() * 1024, random() * 1024, random() * 4, 1 + random() * 2);
-  }
-  if (kind === "shell") {
-    for (let row = -1; row < 7; row++) for (let col = -1; col < 7; col++) {
-      const x = col * 190 + (row % 2) * 95, y = row * 160;
-      for (let ring = 0; ring < 5; ring++) {
-        c.beginPath(); for (let j = 0; j <= 6; j++) { const a = Math.PI / 3 * j + Math.PI / 6, radius = 105 - ring * 8; const xx = x + Math.cos(a) * radius, yy = y + Math.sin(a) * radius; j ? c.lineTo(xx, yy) : c.moveTo(xx, yy); }
-        c.strokeStyle = ring === 0 ? "#282619" : "rgba(33,29,15,.24)"; c.lineWidth = ring === 0 ? 9 : 2; c.stroke();
-      }
-    }
-  }
-  if (kind === "coin") {
-    c.strokeStyle = "#50401f"; c.lineWidth = 12; c.beginPath(); c.arc(512,512,463,0,Math.PI*2); c.stroke();
-    c.lineWidth = 5; c.beginPath(); c.arc(512,512,435,0,Math.PI*2); c.stroke();
-    c.font = 'bold 170px "KaiTi", "STKaiti", serif'; c.fillStyle = "#48371e"; c.textAlign = "center"; c.textBaseline = "middle";
-    c.fillText("乾", 512, 210); c.fillText("隆", 512, 820); c.fillText("通", 800, 515); c.fillText("寶", 210, 515);
-  }
-  if (kind === "coin") {
-    for(let i=0;i<950;i++){
-      const x=random()*1024,y=random()*1024;
-      if(Math.hypot(x-512,y-512)>470)continue;
-      c.fillStyle=random()>.6?'rgba(64,96,70,.22)':'rgba(60,46,25,.16)';
-      c.beginPath();c.ellipse(x,y,random()*7+1,random()*3+1,random()*Math.PI,0,Math.PI*2);c.fill();
-    }
-  }
-  const t = new THREE.CanvasTexture(canvas); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
-}
-
-function Coin({ map }: { map: THREE.Texture }) {
-  const shape = useMemo(() => {
-    const s = new THREE.Shape(); s.absarc(0, 0, .25, 0, Math.PI * 2, false);
-    const hole = new THREE.Path(); hole.moveTo(-.07,-.07); hole.lineTo(-.07,.07); hole.lineTo(.07,.07); hole.lineTo(.07,-.07); hole.closePath(); s.holes.push(hole); return s;
-  }, []);
-  return <group rotation={[-Math.PI / 2, 0, 0]}>
-    <mesh castShadow receiveShadow position={[0,0,-.008]}><extrudeGeometry args={[shape,{depth:.016,bevelEnabled:true,bevelSize:.002,bevelThickness:.002,bevelSegments:1,steps:1,curveSegments:40}]}/><meshStandardMaterial color="#8c754c" metalness={.72} roughness={.62}/></mesh>
-    {[1,-1].map(side => <mesh key={side} position={[0,0,side * .011]} rotation={[0,side === 1 ? 0 : Math.PI,0]}><ringGeometry args={[.105,.242,48]}/><meshStandardMaterial map={map} color={side === 1 ? "#c5af7d" : "#7a6d4c"} metalness={.5} roughness={.65}/></mesh>)}
-  </group>;
-}
-
-function LaunchedCoin({map,gesture,mouth,index,register,onImpact}:{map:THREE.Texture;gesture:RefObject<ShakeGesture>;mouth:RefObject<THREE.Vector3>;index:number;register:(body:RapierRigidBody|null)=>void;onImpact:()=>void}){
+function LaunchedCoin({map,gesture,mouth,index,register,onImpact}:{map:CoinAssets;gesture:RefObject<ShakeGesture>;mouth:RefObject<THREE.Vector3>;index:number;register:(body:RapierRigidBody|null)=>void;onImpact:()=>void}){
   const body=useRef<RapierRigidBody|null>(null);
   const touched=useRef(false);
   useAfterPhysicsStep(()=>{
@@ -77,10 +33,10 @@ function LaunchedCoin({map,gesture,mouth,index,register,onImpact}:{map:THREE.Tex
     velocity:[gesture.current.direction*(.65+Math.random()*.55)+(index-1)*.35,.3+Math.random()*.45,1.1+Math.random()*.8] as [number,number,number],
     angular:[4+Math.random()*5,(Math.random()-.5)*7,gesture.current.direction*(3+Math.random()*4)] as [number,number,number],
   }),[]);
-  return <RigidBody ref={b=>{body.current=b;register(b);}} additionalSolverIterations={8} position={initial.position} rotation={initial.rotation} linearVelocity={initial.velocity} angularVelocity={initial.angular} colliders={false} restitution={.08} friction={.75} linearDamping={.35} angularDamping={.9} ccd onCollisionEnter={()=>{touched.current=true;body.current?.setLinearDamping(COIN_CONTACT_DAMPING.linear);body.current?.setAngularDamping(COIN_CONTACT_DAMPING.angular);onImpact();}}><CylinderCollider args={[.01,.25]} contactSkin={.002}/><Coin map={map}/></RigidBody>;
+  return <RigidBody ref={b=>{body.current=b;register(b);}} additionalSolverIterations={8} position={initial.position} rotation={initial.rotation} linearVelocity={initial.velocity} angularVelocity={initial.angular} colliders={false} restitution={.08} friction={.75} linearDamping={.35} angularDamping={.9} ccd onCollisionEnter={()=>{touched.current=true;body.current?.setLinearDamping(COIN_CONTACT_DAMPING.linear);body.current?.setAngularDamping(COIN_CONTACT_DAMPING.angular);onImpact();}}><CylinderCollider args={[.01,.25]} contactSkin={.002}/><Coin assets={map}/></RigidBody>;
 }
 
-function FallingCoins({map,gesture,onSettled,onImpact,coinPositions,mouth,count}:{count:number;coinPositions:RefObject<THREE.Vector3[]>;mouth:RefObject<THREE.Vector3>;map:THREE.Texture;gesture:RefObject<ShakeGesture>;onSettled:(value:number|null)=>void;onImpact:()=>void}){
+function FallingCoins({map,gesture,onSettled,onImpact,coinPositions,mouth,count}:{count:number;coinPositions:RefObject<THREE.Vector3[]>;mouth:RefObject<THREE.Vector3>;map:CoinAssets;gesture:RefObject<ShakeGesture>;onSettled:(value:number|null)=>void;onImpact:()=>void}){
   const bodies=useRef<(RapierRigidBody|null)[]>([]),still=useRef(0),finished=useRef(false);
   const {rapier}=useRapier();
   function complete(value:number|null){
@@ -143,7 +99,7 @@ function Shell({ phase, gesture, onGrab, canGrab, group, anchor, mouth }: {
     }
     object.position.set(values[0],values[1],values[2]); object.rotation.x=values[3]; object.rotation.z=values[4];
     object.updateWorldMatrix(true,false);
-    mouth.current.set(0,.13,1.43).applyMatrix4(object.matrixWorld);
+    mouth.current.set(0,.26,1.42).applyMatrix4(object.matrixWorld);
     // The input surface and motion cues follow the actual raised and tilted shell.
     if(anchor.current){
       let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
@@ -163,7 +119,7 @@ function Shell({ phase, gesture, onGrab, canGrab, group, anchor, mouth }: {
   </group>;
 }
 
-function ReturningCoins({map,positions,mouth,onLoaded}:{map:THREE.Texture;positions:RefObject<THREE.Vector3[]>;mouth:RefObject<THREE.Vector3>;onLoaded:()=>void}){
+function ReturningCoins({map,positions,mouth,onLoaded}:{map:CoinAssets;positions:RefObject<THREE.Vector3[]>;mouth:RefObject<THREE.Vector3>;onLoaded:()=>void}){
   const groups=useRef<(THREE.Group|null)[]>([]),elapsed=useRef(0),done=useRef(false);
   const starts=useMemo(()=>positions.current.map(p=>p.clone()),[]);
   useFrame((_,dt)=>{
@@ -176,29 +132,29 @@ function ReturningCoins({map,positions,mouth,onLoaded}:{map:THREE.Texture;positi
     });
     if(elapsed.current>1.22 && !done.current){done.current=true;onLoaded();}
   });
-  return <>{starts.map((p,i)=><group key={i} ref={o=>{groups.current[i]=o;}} position={p}><Coin map={map}/></group>)}</>;
+  return <>{starts.map((p,i)=><group key={i} ref={o=>{groups.current[i]=o;}} position={p}><Coin assets={map}/></group>)}</>;
 }
 
-export function DeskScene({ released, anchor, onLoaded, highlighted, active, onArrival, phase, round, gesture, onGrab, canGrab, onSettled, onImpact, onReady }: { released:number; anchor: RefObject<HTMLButtonElement | null>; onLoaded:()=>void; highlighted: boolean; active: boolean; onArrival: (ready: boolean) => void; phase: string; round: number; gesture: RefObject<ShakeGesture>; onGrab: (id: number,x: number,y: number) => void; canGrab: boolean; onSettled: (value: number | null) => void; onImpact: () => void; onReady: () => void }) {
+/** Deepen the rosewood toward the reference's oxblood brown; the table must not out-shine the mat. */
+const deskTune: Tune = m => { if (m.name === 'desk_wood') { m.color.set('#b08a7c'); m.roughness = Math.max(m.roughness, .55); } };
+export function DeskScene({ oracleAnchor, choosing, track, instantArrival, method,oraclePhase,oracleMotion,oracle, released, anchor, onLoaded, highlighted, active, onArrival, phase, round, gesture, onGrab, canGrab, onSettled, onImpact, onReady }: { oracleAnchor:RefObject<HTMLDivElement | null>; choosing:boolean; track:RefObject<MethodTrack>; instantArrival:boolean; method:DivinationMethod;oraclePhase:OraclePhase;oracleMotion:RefObject<OracleMotion>;oracle?:OracleResult|null;released:number; anchor: RefObject<HTMLButtonElement | null>; onLoaded:()=>void; highlighted: boolean; active: boolean; onArrival: (ready: boolean) => void; phase: string; round: number; gesture: RefObject<ShakeGesture>; onGrab: (id: number,x: number,y: number) => void; canGrab: boolean; onSettled: (value: number | null) => void; onImpact: () => void; onReady: () => void }) {
   const shellGroup = useRef<THREE.Group>(null);
   const coinPositions=useRef([-1,0,1].map(i=>new THREE.Vector3(i*.65-.3,.045,1.5))), mouth=useRef(new THREE.Vector3(-.65,1.35,.6));
   useEffect(()=>{if(phase === "idle")coinPositions.current=[-1,0,1].map(i=>new THREE.Vector3(i*.65-.3,.045,1.5));},[phase]);
-  const sources = useLoader(THREE.TextureLoader, [walnutUrl]);
-  const wood = useMemo(() => { const map = sources[0].clone(); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8; map.needsUpdate = true; return map; }, [sources]);
-  const woodDetail = useMemo(() => surfaceDetail("wood"), []), clothDetail = useMemo(() => surfaceDetail("cloth"), []);
-  const coin = useMemo(() => texture("coin"), []);
+  const coin = useCoinAssets();
   useEffect(() => { onReady(); }, []);
-  useEffect(() => () => { wood.dispose(); woodDetail.dispose(); clothDetail.dispose(); coin.dispose(); }, [wood,woodDetail,clothDetail,coin]);
   return <>
     <ShellOutline target={shellGroup} active={active && canGrab && (highlighted || phase === "shaking")}/>
-    <color attach="background" args={["#1d1a13"]}/><hemisphereLight intensity={1.05} color="#e2ded0" groundColor="#3a3026"/><directionalLight castShadow position={[-3,7,2]} intensity={2.65} color="#fff0d5" shadow-mapSize={[2048,2048]} shadow-camera-left={-8} shadow-camera-right={8} shadow-camera-top={8} shadow-camera-bottom={-8} shadow-bias={-.00015} shadow-normalBias={.025} shadow-radius={3}/><pointLight position={[4,3,-2]} intensity={8} color="#bdbdb0"/>
-    <mesh receiveShadow position={[0,-.17,0]}><boxGeometry args={[24,.3,20]}/><meshStandardMaterial map={wood} bumpMap={woodDetail.bump} bumpScale={.012} roughnessMap={woodDetail.roughness} roughness={.8} color="#a7967d"/></mesh>
-    <mesh receiveShadow rotation={[-Math.PI/2,0,-.06]} position={[-.1,-.007,.8]}><planeGeometry args={[4.9,4.9]}/><meshStandardMaterial color="#716247" roughness={1}/></mesh>
-    <mesh receiveShadow rotation={[-Math.PI/2,0,-.06]} position={[-.1,-.006,.8]}><planeGeometry args={[4.68,4.68]}/><meshStandardMaterial color="#847c61" roughnessMap={clothDetail.roughness} bumpMap={clothDetail.bump} bumpScale={.007} roughness={1}/></mesh>
-    <DeskObjects wood={wood}/><Candle/>
-    <Arrival active={active} onArrival={onArrival}>
+    <color attach="background" args={["#241a12"]}/><fog attach="fog" args={["#241a12",16,34]}/><hemisphereLight intensity={1.55} color="#ffeedd" groundColor="#5c4532"/><directionalLight castShadow position={[-3,7,2]} intensity={2.1} color="#ffe4c0" shadow-mapSize={[2048,2048]} shadow-camera-left={-8} shadow-camera-right={8} shadow-camera-top={8} shadow-camera-bottom={-8} shadow-bias={-.00015} shadow-normalBias={.025} shadow-radius={3}/><pointLight position={[4.5,3.2,-1.5]} intensity={8} distance={20} decay={1.6} color="#ffd6a6"/><pointLight position={[0,4.5,6]} intensity={10} distance={18} decay={1.6} color="#ffe8cc"/>
+    {/* Ming-style rosewood table (scripts/blender/desk.py): top surface at y = -0.02, front edge at z = 3.9. */}
+    <Model name="desk" position={[0,-.02,0]} shadows={false} tune={deskTune}/><DeskMat/>
+    <mesh receiveShadow rotation={[-Math.PI/2,0,0]} position={[0,-3.02,0]}><planeGeometry args={[60,60]}/><meshStandardMaterial color="#2a1d14" roughness={.9}/></mesh>
+    <SceneEnvironment intensity={.45}/><DeskObjects/><DeskLamp/>
+    <Suspense fallback={null}><MethodCarousel track={track} coin={coin} visible={choosing}/></Suspense>
+    {active && method!=='liuyao' && <OracleTool method={method} phase={oraclePhase} motion={oracleMotion} result={oracle} anchor={oracleAnchor}/>}
+    <Arrival active={active && method==='liuyao'} instant={instantArrival} onArrival={onArrival}>
     <Shell group={shellGroup} anchor={anchor} mouth={mouth} phase={phase} gesture={gesture} onGrab={onGrab} canGrab={canGrab}/>
-    {round === 0 && phase === "idle" && [-1,0,1].map(i => <group key={i} position={[i*.65-.3,.045,1.5]} rotation={[0,i*.7,0]}><Coin map={coin}/></group>)}
+    {round === 0 && phase === "idle" && [-1,0,1].map(i => <group key={i} position={[i*.65-.3,.045,1.5]} rotation={[0,i*.7,0]}><Coin assets={coin}/></group>)}
     </Arrival>{phase === "loading" && <ReturningCoins map={coin} positions={coinPositions} mouth={mouth} onLoaded={onLoaded}/>}<Physics gravity={[0,-9.81,0]} timeStep={1/60}><RigidBody type="fixed" colliders={false}><CuboidCollider args={[12,.15,10]} position={[0,-.17,0]}/>{[[0,0,-4],[0,0,4],[-3,0,0],[3,0,0]].map((p,i) => <CuboidCollider key={i} position={p as [number,number,number]} args={i<2 ? [3,1,.1] : [.1,1,4]}/>)}</RigidBody>{active && released > 0 && (phase === "shaking" || phase === "falling" || phase === "settled") && <FallingCoins count={released} key={round} coinPositions={coinPositions} mouth={mouth} map={coin} gesture={gesture} onSettled={onSettled} onImpact={onImpact}/>}</Physics>
   </>;
 }

@@ -29,7 +29,11 @@ const CALL_TOKEN_HOLD = 120_000; // 96 KB of input + at most 24K output tokens; 
 export class WebAi {
   private timer: ReturnType<typeof setInterval> | undefined;
   private active: Promise<void> | undefined;
-  constructor(private readonly db: Database, private readonly processor: AiProcessor, private readonly limits = { dailyTokens: 2_400_000, userDailyCalls: 12 }) {}
+  constructor(private readonly db: Database, private readonly processor: AiProcessor, private readonly limits: { dailyTokens: number; userDailyCalls: number; enforced?: boolean } = { dailyTokens: 2_400_000, userDailyCalls: 12 }) {}
+
+  // 额度开关关闭时，试用次数、追问上限、每日调用数和 token 预算都不参与拦截；
+  // 账本与预算表仍保留，重新开启后历史数据依然可用。
+  private get enforced(): boolean { return this.limits.enforced !== false; }
 
   async conversation(owner: string, id: string): Promise<AiConversationView> {
     const c = await this.db.query<{ framing: FramingView | null }>("SELECT framing FROM consultations WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL", [id, owner]);
@@ -37,7 +41,8 @@ export class WebAi {
     const runs = await this.db.query<Run>("SELECT * FROM ai_runs WHERE consultation_id=$1 AND owner_id=$2 ORDER BY created_at,id", [id, owner]);
     const account = await this.db.query<{ follow_ups_per_consultation: number }>("SELECT follow_ups_per_consultation FROM trial_accounts WHERE user_id=$1", [owner]);
     const used = runs.rows.filter(r => r.kind === "follow_up" && r.status !== "failed").length;
-    return { runs: runs.rows.map(view), framing: c.rows[0]!.framing, remainingFollowUps: Math.max(0, (account.rows[0]?.follow_ups_per_consultation ?? 0) - used) };
+    const remainingFollowUps = this.enforced ? Math.max(0, (account.rows[0]?.follow_ups_per_consultation ?? 0) - used) : null;
+    return { runs: runs.rows.map(view), framing: c.rows[0]!.framing, remainingFollowUps };
   }
 
   async enqueue(owner: string, consultationId: string, key: string, kind: AiRunKind, question = ""): Promise<AiRunView> {
@@ -54,30 +59,32 @@ export class WebAi {
         if (prior.rows[0].request_hash !== requestHash) reject(409, "request_conflict", "重试请求的内容不能改变");
         return view(prior.rows[0]);
       }
-      const c = await tx.query<{ chart: unknown; framing: FramingView | null }>("SELECT chart,framing FROM consultations WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL FOR UPDATE", [consultationId, owner]);
+      const c = await tx.query<{ chart: unknown; oracle: unknown; framing: FramingView | null }>("SELECT chart,oracle,framing FROM consultations WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL FOR UPDATE", [consultationId, owner]);
       if (!c.rows[0]) reject(404, "not_found", "咨询不存在");
       const previous = await tx.query<Run>("SELECT * FROM ai_runs WHERE consultation_id=$1", [consultationId]);
       if (previous.rows.some(r => r.status === "queued" || r.status === "running")) reject(409, "generation_active", "这次问事正在生成，请稍候");
       const initial = previous.rows.some(r => r.kind === "initial" && r.status === "succeeded");
       if (kind === "framing") {
-        if (c.rows[0]!.chart) reject(409, "chart_fixed", "已起卦的问题无需重新确认");
-        if (account.rows[0]!.available < 1) reject(402, "trial_exhausted", "免费咨询额度已用完");
+        if (c.rows[0]!.chart || c.rows[0]!.oracle) reject(409, "chart_fixed", "已起卦的问题无需重新确认");
+        if (this.enforced && account.rows[0]!.available < 1) reject(402, "trial_exhausted", "免费咨询额度已用完");
         if (previous.rows.filter(r => r.kind === "framing").length >= 3) reject(429, "framing_limit", "问题确认已达上限，可按当前问题继续起卦");
         if (c.rows[0]!.framing?.status === "ready") reject(409, "already_ready", "问题已经确认，可以起卦");
         if (c.rows[0]!.framing?.status === "needs_clarification" && !question) reject(400, "answer_required", "请回答需要确认的问题");
-      } else if (!c.rows[0]!.chart) reject(409, "chart_required", "请先完成起卦");
+      } else if (!c.rows[0]!.chart && !c.rows[0]!.oracle) reject(409, "chart_required", "请先完成起卦");
       if (kind === "initial" && initial) reject(409, "already_interpreted", "已有解读，请继续追问");
       if (kind === "follow_up") {
         if (!initial) reject(409, "initial_required", "请先完成首轮解读");
-        if (previous.rows.filter(r => r.kind === "follow_up" && r.status === "succeeded").length >= account.rows[0]!.follow_ups_per_consultation) reject(402, "follow_up_exhausted", "本次咨询的免费追问已用完，付费功能尚未开放");
+        if (this.enforced && previous.rows.filter(r => r.kind === "follow_up" && r.status === "succeeded").length >= account.rows[0]!.follow_ups_per_consultation) reject(402, "follow_up_exhausted", "本次咨询的免费追问已用完，付费功能尚未开放");
       }
-      const count = await tx.query<{ count: string }>("SELECT count(*)::text AS count FROM ai_runs WHERE owner_id=$1 AND created_at >= date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'", [owner]);
-      if (Number(count.rows[0]!.count) >= this.limits.userDailyCalls) reject(429, "daily_limit", "今日 AI 调用已达上限，请明天再来");
-      await tx.query("INSERT INTO ai_daily_budget(day) VALUES((now() AT TIME ZONE 'UTC')::date) ON CONFLICT DO NOTHING");
-      const budget = await tx.query("UPDATE ai_daily_budget SET reserved_tokens=reserved_tokens+$1 WHERE day=(now() AT TIME ZONE 'UTC')::date AND reserved_tokens+$1<=$2 RETURNING day", [CALL_TOKEN_HOLD, this.limits.dailyTokens]);
-      if (!budget.rows.length) reject(429, "budget_exhausted", "今日免费体验预算已用完，请明天再来");
+      if (this.enforced) {
+        const count = await tx.query<{ count: string }>("SELECT count(*)::text AS count FROM ai_runs WHERE owner_id=$1 AND created_at >= date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'", [owner]);
+        if (Number(count.rows[0]!.count) >= this.limits.userDailyCalls) reject(429, "daily_limit", "今日 AI 调用已达上限，请明天再来");
+        await tx.query("INSERT INTO ai_daily_budget(day) VALUES((now() AT TIME ZONE 'UTC')::date) ON CONFLICT DO NOTHING");
+        const budget = await tx.query("UPDATE ai_daily_budget SET reserved_tokens=reserved_tokens+$1 WHERE day=(now() AT TIME ZONE 'UTC')::date AND reserved_tokens+$1<=$2 RETURNING day", [CALL_TOKEN_HOLD, this.limits.dailyTokens]);
+        if (!budget.rows.length) reject(429, "budget_exhausted", "今日免费体验预算已用完，请明天再来");
+      }
       let reservation: string | null = null;
-      if (kind === "initial") {
+      if (kind === "initial" && this.enforced) {
         const balance = await tx.query("UPDATE trial_accounts SET available=available-1 WHERE user_id=$1 AND available>0 RETURNING available", [owner]);
         if (!balance.rows.length) reject(402, "trial_exhausted", "免费咨询额度已用完");
         reservation = randomUUID();
@@ -115,8 +122,8 @@ export class WebAi {
       if (Number(running.rows[0]!.count) >= 2) return undefined;
       const pending = await tx.query<Run>("SELECT * FROM ai_runs WHERE status='queued' ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED");
       if (!pending.rows[0]) return undefined;
-      const crossedDay = await tx.query("SELECT id FROM ai_runs WHERE id=$1 AND (created_at AT TIME ZONE 'UTC')::date < (now() AT TIME ZONE 'UTC')::date", [pending.rows[0].id]);
-      if (crossedDay.rows.length) {
+      const crossedDay = this.enforced ? await tx.query("SELECT id FROM ai_runs WHERE id=$1 AND (created_at AT TIME ZONE 'UTC')::date < (now() AT TIME ZONE 'UTC')::date", [pending.rows[0].id]) : undefined;
+      if (crossedDay?.rows.length) {
         await tx.query("INSERT INTO ai_daily_budget(day) VALUES((now() AT TIME ZONE 'UTC')::date) ON CONFLICT DO NOTHING");
         const budget = await tx.query("UPDATE ai_daily_budget SET reserved_tokens=reserved_tokens+$1 WHERE day=(now() AT TIME ZONE 'UTC')::date AND reserved_tokens+$1<=$2 RETURNING day", [CALL_TOKEN_HOLD, this.limits.dailyTokens]);
         // Keep old jobs queued when today's budget is exhausted; never make an unbudgeted call.

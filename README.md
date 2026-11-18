@@ -24,7 +24,7 @@ npm ci
 npm run web:local
 ```
 
-打开 `http://localhost:5173`。一次性邀请码在 `logs/web-local/invitation.txt`，用于网页注册；本地数据保存在 `logs/web-local/database`，重启后保留。此模式仅监听本机，不能用于公开运营。重新启动时，如果旧邀请码已用或过期，会生成新的邀请码。
+打开终端里打印的「网页：」地址，默认是 `http://localhost:5173`。如果 5173（或 API 用的 3000）已被其它程序占用，会自动往后找空闲端口并打印出来（跳过 5174，那是界面预览用的）；也可以用环境变量固定，例如 `WEB_PORT=5180 API_PORT=3010 npm run web:local`。一次性邀请码在 `logs/web-local/invitation.txt`，用于网页注册；本地数据保存在 `logs/web-local/database`，重启后保留。此模式仅监听本机，不能用于公开运营。重新启动时，如果旧邀请码已用或过期，会生成新的邀请码。
 
 ## 本地验证
 
@@ -94,5 +94,9 @@ schemas/        JSON Schema
 src/calendar/   历法适配器
 src/domain/     六爻领域类型、基础数据和排盘引擎
 tests/          自动化测试与黄金案例
-Skill/          完整六爻占断 Skill、分层参考规则与行为评测
+Skill/liuyao/   完整六爻占断 Skill、分层参考规则与行为评测
+Skill/meihua/   梅花易数（三数法）解读 Skill
+Skill/qiuqian/  关帝百签解读 Skill
+Skill/jiaobei/  掷筊解读 Skill
+Skill/shared/   梅花、求签、掷筊共用的表达与安全边界
 ```

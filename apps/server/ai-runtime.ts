@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import {runOracleReading,loadOracleSkillBundle,ORACLE_RULES_VERSION} from "../../src/divination/interpretation.js";
+import { join, resolve } from "node:path";
 import { DeepSeekGateway } from "../../src/ai/deepSeekGateway.js";
 import { loadLiuyaoSkillBundle } from "../../src/ai/skillBundle.js";
 import { runDirectInterpretation, runDirectFollowUp } from "../../src/ai/directInterpretation.js";
@@ -7,17 +8,20 @@ import type { AiGateway } from "../../src/ai/types.js";
 import { digest } from "./security.js";
 import { WebAi, type AiProcessor } from "./ai.js";
 import type { Database } from "./database.js";
+import { quotaEnforced } from "./quota.js";
 
 export async function loadWebAi(db: Database): Promise<WebAi | undefined> {
   const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
   if (!apiKey || process.env.WEB_AI_ENABLED === "false") return undefined;
-  const skill = await loadLiuyaoSkillBundle(resolve(process.env.LIUYAO_SKILL_PATH ?? "Skill"));
+  const skillRoot = resolve(process.env.SKILL_ROOT ?? "Skill");
+  const skill = await loadLiuyaoSkillBundle(resolve(process.env.LIUYAO_SKILL_PATH ?? join(skillRoot, "liuyao")));
+  const oracleSkills = await loadOracleSkillBundle(skillRoot);
   const model = process.env.DEEPSEEK_MODEL?.trim() || "deepseek-v4-flash";
   const thinking = process.env.DEEPSEEK_THINKING ?? "enabled";
   const effort = process.env.DEEPSEEK_REASONING_EFFORT ?? "high";
   if (!["enabled", "disabled"].includes(thinking) || !["low", "high", "max"].includes(effort)) throw new Error("AI 配置不正确");
   const processor: AiProcessor = {
-    model, skillHash: digest(JSON.stringify(skill)),
+    model, skillHash: digest(JSON.stringify(skill)+ORACLE_RULES_VERSION+JSON.stringify(oracleSkills)),
     async execute(input, progress, telemetry) {
       let content = "";
       const gateway = new DeepSeekGateway({
@@ -43,8 +47,12 @@ export async function loadWebAi(db: Database): Promise<WebAi | undefined> {
       const question = framing?.normalizedQuestion ?? c.question;
       if (input.kind === "framing") {
         if (input.question) background = [...background, `起卦前确认：${resolveClarificationAnswer(input.question, framing?.choices ?? [])}`];
-        const result = await frameConsultationQuestion({ gateway: bounded, topic: c.topic, question, timeWindow: c.timeWindow, background });
+        const result = await frameConsultationQuestion({ gateway: bounded, method: c.method ?? "liuyao", topic: c.topic, question, timeWindow: c.timeWindow, background });
         return { framing: { ...result, choices: [...result.choices], background: [...background] } };
+      }
+      if (c.oracle) {
+        const turns = input.conversation.runs.filter(r => r.status === "succeeded" && r.kind !== "framing").map(r => ({ kind: r.kind as "initial" | "follow_up", question: r.kind === "initial" ? question : r.question, answer: r.text }));
+        return runOracleReading({ gateway: bounded, skills: oracleSkills, consultation: { topic: c.topic, question, timeWindow: c.timeWindow, background, oracle: c.oracle }, turns, followUp: input.kind === "follow_up" ? input.question : null });
       }
       if (!c.chart) throw new Error("Missing fixed chart");
       const consultation = { chartId: c.id, chart: c.chart, topic: c.topic, question, timeWindow: c.timeWindow, background };
@@ -62,5 +70,5 @@ export async function loadWebAi(db: Database): Promise<WebAi | undefined> {
   const dailyTokens = Number(process.env.WEB_AI_DAILY_TOKEN_BUDGET ?? 2400000);
   const userDailyCalls = Number(process.env.WEB_AI_USER_DAILY_CALLS ?? 12);
   if (![dailyTokens, userDailyCalls].every(n => Number.isSafeInteger(n) && n >= 0)) throw new Error("AI 预算必须为非负整数");
-  return new WebAi(db, processor, { dailyTokens, userDailyCalls });
+  return new WebAi(db, processor, { dailyTokens, userDailyCalls, enforced: quotaEnforced });
 }

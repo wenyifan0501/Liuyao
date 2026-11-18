@@ -197,7 +197,7 @@ async function main(): Promise<void> {
       onCall: (event) => logger.append("api_call", event),
       onProgress: handleProgress,
     });
-    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill"));
+    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill", "liuyao"));
     const topic = await chooseTopic(rl);
     const question = await askRequired(rl, "\n你想占问什么？\n> ");
     const timeWindowInput = (await rl.question("关注的时间范围（可留空）：")).trim();

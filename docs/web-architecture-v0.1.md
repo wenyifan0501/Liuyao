@@ -33,7 +33,8 @@ apps/server/          HTTP API、鉴权、服务层
 apps/worker/          AI 任务入口
 packages/contracts/   公开请求、响应、事件类型与运行时校验
 src/                  复用现有核心与 CLI，初期保留路径
-Skill/                原有规则，不调整表达风格
+Skill/liuyao/         原有六爻规则，不调整表达风格
+Skill/{meihua,qiuqian,jiaobei}/  三种问事方式的解读 Skill，共用 Skill/shared/
 schemas/              现有业务 Schema
 db/                   数据定义与版本迁移
 deploy/               Dockerfile、Compose、Caddy 配置

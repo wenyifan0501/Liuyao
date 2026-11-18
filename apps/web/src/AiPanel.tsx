@@ -4,6 +4,13 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import type { AiConversationView, AiRunKind, AiRunView, ConsultationView } from "../../../packages/contracts";
 import { api } from "./api";
 
+const COPY = {
+  liuyao: { verb: "起卦", intro: "让 AI 确认是否还缺少关键信息，再开始起卦。", heading: "本次解读", working: "正在结合卦盘分析…", start: "开始 AI 解读", ask: "你最想进一步了解什么？" },
+  meihua: { verb: "报数起卦", intro: "让 AI 确认体用所指是否清楚，再报数起卦。", heading: "梅花断语", working: "正在推演体用与旺衰…", start: "开始断卦", ask: "例如：互卦里的阻滞，具体会落在哪一环？" },
+  qiuqian: { verb: "求签", intro: "让 AI 确认所问之事是否具体，再去求签。", heading: "解签", working: "正在细读签诗…", start: "请解此签", ask: "例如：诗里哪一句对应我眼下这一步？" },
+  jiaobei: { verb: "掷筊", intro: "掷筊只答是非。让 AI 帮你把问题收成一句「可不可以」。", heading: "筊意", working: "正在体会筊意…", start: "开始解读", ask: "围绕这一筊，你还想厘清什么？" },
+} as const;
+
 export function AiPanel({ consultation, onQuota, enabled = true }: { consultation: ConsultationView; onQuota: () => Promise<void>; enabled?: boolean }) {
   const [data, setData] = useState<AiConversationView | null>(null);
   const [error, setError] = useState("");
@@ -18,6 +25,7 @@ export function AiPanel({ consultation, onQuota, enabled = true }: { consultatio
   const signature = useRef("");
   const active = data?.runs.find(r => r.status === "queued" || r.status === "running");
   const initial = data?.runs.find(r => r.kind === "initial" && r.status === "succeeded");
+  const copy = COPY[consultation.method ?? "liuyao"];
 
   useEffect(() => {
     let live = true;
@@ -49,7 +57,7 @@ export function AiPanel({ consultation, onQuota, enabled = true }: { consultatio
     if (request.current?.body !== encoded) request.current = { body: encoded, key: crypto.randomUUID() };
     try {
       const run = await api<AiRunView>(`/consultations/${consultation.id}/ai`, body, request.current.key);
-      setData(old => ({ framing: old?.framing ?? null, remainingFollowUps: old?.remainingFollowUps ?? 0, runs: [...(old?.runs.filter(r => r.id !== run.id) ?? []), run] }));
+      setData(old => ({ framing: old?.framing ?? null, remainingFollowUps: old?.remainingFollowUps ?? null, runs: [...(old?.runs.filter(r => r.id !== run.id) ?? []), run] }));
       signature.current = run.id;
       request.current = null;
       setPollingKick(value => value + 1);
@@ -62,26 +70,28 @@ export function AiPanel({ consultation, onQuota, enabled = true }: { consultatio
 
   if (!data) return <div className="availability" role="status">{connectionError || "正在读取咨询进度…"}</div>;
   const last = data.runs.at(-1);
-  const failed = last?.status === "failed" && (consultation.chart ? last.kind !== "framing" : last.kind === "framing") ? last : undefined;
+  const failed = last?.status === "failed" && ((consultation.chart || consultation.oracle) ? last.kind !== "framing" : last.kind === "framing") ? last : undefined;
   const framing = data.framing;
+  const followUpsLeft = data.remainingFollowUps;
+  const unlimited = followUpsLeft === null;
   return <div className="ai-panel">
     {!enabled && <div className="availability">AI 服务未启用，已有解读仍可查看。暂时无法生成新的解读。</div>}
     {(error || connectionError) && <p className="form-error" role="alert">{error || connectionError}</p>}
-    {!consultation.chart && <div className="framing-card">
+    {!(consultation.chart || consultation.oracle) && <div className="framing-card">
       <h3><Sparkles size={17}/> 先把问题说清楚</h3>
-      {!framing && <><p>让 AI 确认是否还缺少关键信息，再开始起卦。</p><button className="outline-button" disabled={!!active || sending || !enabled} onClick={() => void start("framing")}>确认问题 <ArrowRight size={15}/></button></>}
-      {framing?.status === "ready" && <><p>{framing.normalizedQuestion}</p><small>问题已确认，可以回到桌面起卦。</small></>}
+      {!framing && <><p>{copy.intro}</p><button className="outline-button" disabled={!!active || sending || !enabled} onClick={() => void start("framing")}>确认问题 <ArrowRight size={15}/></button></>}
+      {framing?.status === "ready" && <><p>{framing.normalizedQuestion}</p><small>问题已确认，可以回到桌面{copy.verb}。</small></>}
       {framing?.status === "needs_clarification" && <><p>{framing.clarifyingQuestion}</p><div className="clarification-choices">{framing.choices.map(choice => <button key={choice} className="outline-button" disabled={sending || !!active} onClick={() => void start("framing", choice)}>{choice}</button>)}</div><form onSubmit={e => { e.preventDefault(); void start("framing", clarification); }}><label className="sr-only" htmlFor="clarification">补充回答</label><input id="clarification" maxLength={2000} value={clarification} onChange={e => setClarification(e.target.value)} placeholder="也可以用自己的话补充…"/><button className="outline-button" disabled={sending || !!active || !clarification.trim()}>提交补充</button></form></>}
-      <small>问题确认有次数上限；也可直接按当前问题起卦。</small>
+      <small>问题确认有次数上限；也可直接按当前问题{copy.verb}。</small>
     </div>}
     {data.runs.filter(r => r.kind !== "framing" && r.status === "succeeded").map(run => <div className="ai-turn" key={run.id}>
       {run.kind === "follow_up" && <div className="user-message">{run.question}</div>}
-      <div className="answer-heading"><Sparkles size={16}/>{run.kind === "initial" ? "本次解读" : "继续聊这件事"}</div>
+      <div className="answer-heading"><Sparkles size={16}/>{run.kind === "initial" ? copy.heading : "继续聊这件事"}</div>
       <div className="ai-answer"><Markdown components={{ img: () => null }}>{run.text}</Markdown></div>
     </div>)}
-    {active && <div className="generation" aria-busy="true"><div className="answer-heading" role="status"><span className="pulse"/>{active.status === "queued" ? "已排队，稍后开始…" : active.kind === "framing" ? "正在确认问题边界…" : active.text ? "正在生成解读…" : "正在结合卦盘分析…"}</div>{active.text && <div className="ai-answer"><Markdown components={{ img: () => null }}>{active.text}</Markdown></div>}<small>可以离开页面，回来后会恢复进度。完成前正文尚未保存为正式回答。</small></div>}
+    {active && <div className="generation" aria-busy="true"><div className="answer-heading" role="status"><span className="pulse"/>{active.status === "queued" ? "已排队，稍后开始…" : active.kind === "framing" ? "正在确认问题边界…" : active.text ? "正在生成解读…" : copy.working}</div>{active.text && <div className="ai-answer"><Markdown components={{ img: () => null }}>{active.text}</Markdown></div>}<small>可以离开页面，回来后会恢复进度。完成前正文尚未保存为正式回答。</small></div>}
     {failed && <div className="availability"><div><p>{failed.error}</p><button className="outline-button" disabled={sending || !!active || !enabled} onClick={() => void start(failed.kind, failed.question)}>重试本次生成</button></div></div>}
-    {consultation.chart && enabled && !initial && !active && !failed && <div className="interpretation-start"><p>卦盘已准备好，可以开始解读。</p><button className="primary-button" disabled={sending} onClick={() => void start("initial")}><Sparkles size={17}/> 开始 AI 解读</button><small>预占 1 次免费咨询额度，生成失败会退还。</small></div>}
-    {initial && <form className="follow-up-box" onSubmit={e => { e.preventDefault(); void start("follow_up", question); }}><label htmlFor="follow-up">围绕这件事，继续聊聊</label><textarea id="follow-up" maxLength={2000} value={question} onChange={e => setQuestion(e.target.value)} placeholder="你最想进一步了解什么？" disabled={sending || !!active}/><div><small>本次还可免费追问 {data.remainingFollowUps} 次</small><button className="primary-button" disabled={!question.trim() || sending || !!active || data.remainingFollowUps < 1 || !enabled}>发送 <ArrowRight size={15}/></button></div>{data.remainingFollowUps === 0 && <p className="muted">免费追问已用完，付费功能尚未开放。已保存的解读仍可查看。</p>}</form>}
+    {(consultation.chart || consultation.oracle) && enabled && !initial && !active && !failed && <div className="interpretation-start"><p>结果已留存，可以开始解读。</p><button className="primary-button" disabled={sending} onClick={() => void start("initial")}><Sparkles size={17}/> {copy.start}</button>{!unlimited && <small>预占 1 次免费咨询额度，生成失败会退还。</small>}</div>}
+    {initial && <form className="follow-up-box" onSubmit={e => { e.preventDefault(); void start("follow_up", question); }}><label htmlFor="follow-up">围绕这件事，继续聊聊</label><textarea id="follow-up" maxLength={2000} value={question} onChange={e => setQuestion(e.target.value)} placeholder={copy.ask} disabled={sending || !!active}/><div><small>{unlimited ? "追问次数不限" : `本次还可免费追问 ${followUpsLeft} 次`}</small><button className="primary-button" disabled={!question.trim() || sending || !!active || (!unlimited && followUpsLeft < 1) || !enabled}>发送 <ArrowRight size={15}/></button></div>{!unlimited && followUpsLeft === 0 && <p className="muted">免费追问已用完，付费功能尚未开放。已保存的解读仍可查看。</p>}</form>}
   </div>;
 }

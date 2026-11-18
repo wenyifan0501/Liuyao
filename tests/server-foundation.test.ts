@@ -39,7 +39,7 @@ async function chartFor(owner: string, key: string): Promise<ConsultationView> {
 
 describe("invite-only API foundation", () => {
   it("runs migrations once and stores no raw password, invite or session tokens", async () => {
-    expect((await db.query("SELECT * FROM schema_migrations")).rows).toHaveLength(3);
+    expect((await db.query("SELECT * FROM schema_migrations")).rows).toHaveLength(4);
     const rows = await db.query<{ password_hash: string }>("SELECT password_hash FROM users");
     expect(rows.rows.every((row) => row.password_hash.startsWith("$argon2id$") && !row.password_hash.includes(password))).toBe(true);
     const session = await db.query<{ token_hash: string }>("SELECT token_hash FROM sessions");
@@ -180,4 +180,19 @@ it("persists favorites, isolates owners and hides deleted records without refund
   expect((await request(cookieA,"favorite",{favorite:true})).statusCode).toBe(404);
   expect((await app.inject({method:"GET",url:`/api/consultations/${c.id}/ai`,headers:{cookie:cookieA}})).statusCode).toBe(404);
   expect(await service.trial(userA)).toEqual(quota);
+});
+
+it('persists three oracle methods once, isolates owners and rejects mismatched cast endpoints',async()=>{
+  for(const method of ['meihua','qiuqian','jiaobei'] as const){
+    const c=await service.create(userA,'oracle-'+method,{...question,method});
+    expect(c.method).toBe(method);
+    await expect(service.oracle(userB,c.id,[3,8,6])).rejects.toMatchObject({statusCode:404});
+    await expect(service.cast(userA,c.id,{method:'simulated_three_coins'})).rejects.toMatchObject({code:'wrong_method'});
+    const results=await Promise.all([service.oracle(userA,c.id,[3,8,6]),service.oracle(userA,c.id,[1,1,1])]);
+    expect(results[0]!.oracle).toEqual(results[1]!.oracle);
+    expect(results[0]!.chart).toBeNull();expect(results[0]!.status).toBe('chart_ready');
+    expect((await service.get(userA,c.id)).oracle).toEqual(results[0]!.oracle);
+    await service.remove(userA,c.id);
+    await expect(service.oracle(userA,c.id,[1,1,1])).rejects.toMatchObject({statusCode:404});
+  }
 });

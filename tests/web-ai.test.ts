@@ -41,7 +41,7 @@ async function consultation(key: string, cast = true) {
 
 it("atomically queues once, reserves once and publishes only one final result", async () => {
   const c = await consultation("ai-initial");
-  const before = (await service.trial(owner)).remainingConsultations;
+  const before = (await service.trial(owner)).remainingConsultations!;
   const previousCalls = calls;
   const results = await Promise.all([ai.enqueue(owner, c.id, "same-key-1", "initial"), ai.enqueue(owner, c.id, "same-key-1", "initial")]);
   expect(results[0]!.id).toBe(results[1]!.id);
@@ -58,7 +58,7 @@ it("atomically queues once, reserves once and publishes only one final result", 
 it("keeps fixed chart and initial result in follow-up context and enforces follow-up allowance", async () => {
   const c = await consultation("ai-follow-up");
   await ai.enqueue(owner, c.id, "follow-initial", "initial"); await ai.tick();
-  const before = (await service.trial(owner)).remainingConsultations;
+  const before = (await service.trial(owner)).remainingConsultations!;
   await ai.enqueue(owner, c.id, "follow-question", "follow_up", "有哪些具体阻力？"); await ai.tick();
   expect(lastInput.consultation.chart).toEqual(c.chart);
   expect(lastInput.conversation.runs.find(r => r.kind === "initial")?.text).toBe("首轮解读");
@@ -70,7 +70,7 @@ it("keeps fixed chart and initial result in follow-up context and enforces follo
 
 it("refunds a failed generation, keeps provider usage and does not replay the same failed request", async () => {
   const c = await consultation("ai-failure");
-  const before = (await service.trial(owner)).remainingConsultations;
+  const before = (await service.trial(owner)).remainingConsultations!;
   failNext = true;
   await ai.enqueue(owner, c.id, "failed-key", "initial"); await ai.tick();
   const state = await ai.conversation(owner, c.id);
@@ -88,7 +88,7 @@ it("refunds a failed generation, keeps provider usage and does not replay the sa
 
 it("recovers interrupted work as failed without repeating a provider call", async () => {
   const c = await consultation("ai-restart");
-  const before = (await service.trial(owner)).remainingConsultations;
+  const before = (await service.trial(owner)).remainingConsultations!;
   const run = await ai.enqueue(owner, c.id, "restart-key", "initial");
   await db.query("UPDATE ai_runs SET status='running',deadline=now()-interval '1 second',partial_text='unfinished' WHERE id=$1", [run.id]);
   const n = calls;
@@ -100,7 +100,7 @@ it("recovers interrupted work as failed without repeating a provider call", asyn
 
 it("includes framing in budgets and blocks casting while it runs", async () => {
   const c = await consultation("ai-framing", false);
-  const before = (await service.trial(owner)).remainingConsultations;
+  const before = (await service.trial(owner)).remainingConsultations!;
   await ai.enqueue(owner, c.id, "framing-key", "framing");
   await expect(service.cast(owner, c.id, { method: "simulated_three_coins" })).rejects.toMatchObject({ code: "generation_active" });
   await ai.tick();
@@ -111,7 +111,7 @@ it("includes framing in budgets and blocks casting while it runs", async () => {
 
 it("denies exhausted global and user budgets without reserving a trial", async () => {
   const c = await consultation("ai-budget");
-  const before = (await service.trial(owner)).remainingConsultations;
+  const before = (await service.trial(owner)).remainingConsultations!;
   await expect(new WebAi(db, processor, { dailyTokens: 0, userDailyCalls: 50 }).enqueue(owner, c.id, "budget-zero", "initial")).rejects.toMatchObject({ code: "budget_exhausted" });
   await expect(new WebAi(db, processor, { dailyTokens: 12000000, userDailyCalls: 0 }).enqueue(owner, c.id, "user-zero", "initial")).rejects.toMatchObject({ code: "daily_limit" });
   expect((await service.trial(owner)).remainingConsultations).toBe(before);
@@ -132,7 +132,7 @@ it("does not start a cross-day queued task without reserving today's budget", as
 
 it("refunds queued work when the saved model configuration changed", async () => {
   const c = await consultation("ai-config-change");
-  const before = (await service.trial(owner)).remainingConsultations;
+  const before = (await service.trial(owner)).remainingConsultations!;
   await ai.enqueue(owner, c.id, "config-change", "initial");
   const n = calls;
   await new WebAi(db, { ...processor, model: "different-model" }).tick();
@@ -153,4 +153,36 @@ it("isolates AI reads and submissions and returns asynchronous API jobs", async 
     expect(response.statusCode).toBe(202); expect(response.json().status).toBe("queued");
     await ai.tick();
   } finally { await app.close(); }
+});
+
+it('queues independent oracle interpretations and follow-ups against the fixed result',async()=>{
+  const person=(await service.register('oracle_reader','testing-password',await service.createInvitation(3,1))).id;
+  for(const method of ['meihua','qiuqian','jiaobei'] as const){
+    const c=await service.create(person,'reading-'+method,{question:'如何安排接下来的学习？',topic:'other',background:[],timeWindow:null,timezone:'Asia/Shanghai',method});
+    await expect(ai.enqueue(person,c.id,'early-'+method,'initial')).rejects.toMatchObject({code:'chart_required'});
+    const fixed=await service.oracle(person,c.id,[3,8,6]);
+    await ai.enqueue(person,c.id,'initial-'+method,'initial');await ai.tick();
+    expect(lastInput.consultation.oracle).toEqual(fixed.oracle);
+    expect(lastInput.consultation.chart).toBeNull();
+    expect((await ai.conversation(person,c.id)).runs[0]?.status).toBe('succeeded');
+    await ai.enqueue(person,c.id,'follow-'+method,'follow_up','下一步呢？');await ai.tick();
+    expect(lastInput.consultation.oracle).toEqual(fixed.oracle);
+  }
+  expect((await service.trial(person)).remainingConsultations).toBe(0);
+});
+
+it("skips trial counts, follow-up caps and daily budgets when quota enforcement is off", async () => {
+  const person = (await service.register("unlimited_reader", "testing-password", await service.createInvitation(0, 0))).id;
+  const free = new ConsultationService(db, { enforced: false });
+  expect(await free.trial(person)).toEqual({ remainingConsultations: null, followUpsPerConsultation: null });
+  const openAi = new WebAi(db, processor, { dailyTokens: 0, userDailyCalls: 0, enforced: false });
+  const c = await free.create(person, "unlimited-reading", { question: "这件事该不该现在推进？", topic: "career", background: [], timeWindow: null, timezone: "Asia/Shanghai" });
+  await free.cast(person, c.id, { method: "simulated_three_coins" });
+  await openAi.enqueue(person, c.id, "unlimited-initial", "initial"); await openAi.tick();
+  expect((await openAi.conversation(person, c.id)).remainingFollowUps).toBeNull();
+  for (const i of [1, 2, 3]) { await openAi.enqueue(person, c.id, `unlimited-follow-${i}`, "follow_up", "继续"); await openAi.tick(); }
+  const runs = (await openAi.conversation(person, c.id)).runs;
+  expect(runs.filter(r => r.kind === "follow_up" && r.status === "succeeded")).toHaveLength(3);
+  const held = await db.query<{ count: string }>("SELECT count(*)::text AS count FROM trial_reservations WHERE owner_id=$1", [person]);
+  expect(held.rows[0]).toEqual({ count: "0" });
 });

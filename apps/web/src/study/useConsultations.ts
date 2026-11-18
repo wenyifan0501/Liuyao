@@ -58,6 +58,12 @@ export function useConsultations() {
       setHistory(h => h.map(c => c.id === result.id ? result : c));
     } catch(e) { fail(e); } finally { lock.current = false; setBusy(false); }
   }
+  async function oracle(numbers?:number[]){
+    if(!current || lock.current)return;lock.current=true;setBusy(true);setError('');
+    try{const result=await api<ConsultationView>(`/consultations/${current.id}/oracle`,numbers?{numbers}:{});
+      if(active.current===result.id)setCurrent(result);setHistory(h=>h.map(c=>c.id===result.id?result:c));return result;
+    }catch(e){fail(e);}finally{lock.current=false;setBusy(false);}
+  }
   async function favorite(id:string,value:boolean) {
     if(lock.current)return;lock.current=true;setBusy(true);setError("");
     try{const result=await api<ConsultationView>(`/consultations/${id}/favorite`,{favorite:value});
@@ -77,5 +83,5 @@ export function useConsultations() {
     try { const data = await api<{ consultations: ConsultationView[] }>(`/consultations?offset=${history.length}`); setHistory(h => [...h, ...data.consultations.filter(c => !h.some(x => x.id === c.id))]); setMore(data.consultations.length === 30); }
     catch(e) { fail(e); } finally { lock.current = false; }
   }
-  return { me, ready, selected, current, history, more, loading, busy, error, auth, setAuth, setError, refresh, create, cast, favorite, remove, logout, loadMore, navigate };
+  return { me, ready, selected, current, history, more, loading, busy, error, auth, setAuth, setError, refresh, create, cast, oracle, favorite, remove, logout, loadMore, navigate };
 }

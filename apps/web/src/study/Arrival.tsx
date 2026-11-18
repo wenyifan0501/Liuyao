@@ -2,10 +2,14 @@ import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-export function Arrival({ active, onArrival, children }: {active: boolean; onArrival: (ready: boolean) => void; children: ReactNode}) {
+/** Slides the casting tray in; `instant` skips the slide when the shell is already in place (picked from the method row). */
+export function Arrival({ active, instant = false, onArrival, children }: {active: boolean; instant?: boolean; onArrival: (ready: boolean) => void; children: ReactNode}) {
   const group=useRef<THREE.Group>(null), elapsed=useRef(0), start=useRef(-18), running=useRef(true);
   const reduced=useMemo(()=>matchMedia('(prefers-reduced-motion: reduce)'),[]);
-  useEffect(()=>{elapsed.current=0;start.current=group.current?.position.x ?? -18;running.current=true;onArrival(false);},[active]);
+  useEffect(()=>{
+    if(active && instant && group.current){group.current.position.x=0;group.current.visible=true;running.current=false;onArrival(true);return;}
+    elapsed.current=0;start.current=group.current?.position.x ?? -18;running.current=true;onArrival(false);
+  },[active]);
   useFrame((_,dt)=>{
     if (!group.current || !running.current) return;
     elapsed.current+=Math.min(dt,.05);

@@ -98,7 +98,7 @@ const consultation = {
 
 describe("AI interpretation pipeline", () => {
   it("loads the project skill into structured, narrative, and direct bundles", async () => {
-    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill"));
+    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill", "liuyao"));
     expect(skill.analysisRules).toContain("# 取用神规则");
     expect(skill.analysisRules).toContain("# 卦盘解释规则");
     expect(skill.narrativeRules).toContain("# 表达、画像与安全边界");
@@ -109,7 +109,7 @@ describe("AI interpretation pipeline", () => {
 
   it("validates structured output before requesting a report", async () => {
     const gateway = new FakeGateway([validInterpretation()]);
-    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill"));
+    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill", "liuyao"));
     const result = await runInterpretationPipeline({ gateway, skill, consultation });
     expect(result).toMatchObject({ structuredAttempts: 1, report: "这是通过校验后生成的用户报告。" });
     expect(gateway.objectRequests).toHaveLength(1);
@@ -123,7 +123,7 @@ describe("AI interpretation pipeline", () => {
       { ...invalid, anchors: { ...invalid.anchors, selfLine: 5 } },
       validInterpretation(),
     ]);
-    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill"));
+    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill", "liuyao"));
     const result = await runInterpretationPipeline({ gateway, skill, consultation });
     expect(result.structuredAttempts).toBe(2);
     expect(gateway.objectRequests[1]?.repair?.issues).toContainEqual(
@@ -135,7 +135,7 @@ describe("AI interpretation pipeline", () => {
   it("does not request narrative text when structured retries are exhausted", async () => {
     const invalid = { ...validInterpretation(), chartId: "wrong-chart" };
     const gateway = new FakeGateway([invalid, invalid]);
-    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill"));
+    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill", "liuyao"));
     await expect(runInterpretationPipeline({ gateway, skill, consultation }))
       .rejects.toMatchObject<Partial<InterpretationPipelineError>>({
         name: "InterpretationPipelineError",
@@ -146,7 +146,7 @@ describe("AI interpretation pipeline", () => {
 
   it("accepts a JSON string from a provider and rejects an empty report", async () => {
     const gateway = new FakeGateway([JSON.stringify(validInterpretation())], "   ");
-    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill"));
+    const skill = await loadLiuyaoSkillBundle(join(process.cwd(), "Skill", "liuyao"));
     await expect(runInterpretationPipeline({ gateway, skill, consultation }))
       .rejects.toThrow("empty report");
   });
