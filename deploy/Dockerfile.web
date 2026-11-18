@@ -1,0 +1,17 @@
+# Build the SPA and serve it together with the /api reverse proxy in one Caddy
+# container. Keeping the site and the API on the same origin is required:
+# the browser sends cookies with SameSite=Strict and the API rejects any other
+# Origin, so a separate frontend domain would break login entirely.
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json ./
+COPY apps/web ./apps/web
+COPY packages ./packages
+COPY src ./src
+RUN npm run web:build
+
+FROM caddy:2-alpine
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/dist/web /srv

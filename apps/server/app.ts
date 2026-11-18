@@ -14,13 +14,15 @@ const credentials = { username: { ...text(32, 3), pattern: "^[a-zA-Z0-9_]+$" }, 
 const params = object({ id: { type: "string", format: "uuid" } }, ["id"]);
 const topics = ["daily", "career", "exam", "finance", "relationship", "cooperation", "travel", "lost_property", "health_tendency", "market_trend", "other"];
 
-export async function createApp(db: Database, options: { origin: string; secureCookies: boolean; logger?: boolean; ai?: WebAi; quotaEnforced?: boolean }) {
+export async function createApp(db: Database, options: { origin: string; secureCookies: boolean; logger?: boolean; ai?: WebAi; quotaEnforced?: boolean; trustProxy?: false | string[] }) {
   const origin = new URL(options.origin).origin;
   if (options.secureCookies && !origin.startsWith("https://")) throw new Error("生产环境 APP_ORIGIN 必须使用 HTTPS");
   const app = Fastify({
     logger: options.logger ? { redact: ["req.headers.cookie", "req.headers.authorization", "res.headers.set-cookie"], serializers: { req: (request) => ({ method: request.method, url: request.url.split("?")[0] ?? "" }) } } : false,
     bodyLimit: 24 * 1024,
-    trustProxy: false,
+    // Only trust the reverse proxy in front of the API, never "true": otherwise a
+    // client could spoof X-Forwarded-For and escape per-IP rate limits.
+    trustProxy: options.trustProxy ?? false,
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false } },
   });
   const service = new ConsultationService(db, { enforced: options.quotaEnforced ?? true });

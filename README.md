@@ -26,6 +26,16 @@ npm run web:local
 
 打开终端里打印的「网页：」地址，默认是 `http://localhost:5173`。如果 5173（或 API 用的 3000）已被其它程序占用，会自动往后找空闲端口并打印出来（跳过 5174，那是界面预览用的）；也可以用环境变量固定，例如 `WEB_PORT=5180 API_PORT=3010 npm run web:local`。一次性邀请码在 `logs/web-local/invitation.txt`，用于网页注册；本地数据保存在 `logs/web-local/database`，重启后保留。此模式仅监听本机，不能用于公开运营。重新启动时，如果旧邀请码已用或过期，会生成新的邀请码。
 
+## 发布到服务器
+
+一台服务器跑完整个站点：Docker Compose 启动 PostgreSQL、API 和 Caddy（自动 HTTPS），页面与 `/api` 同源，因此登录 Cookie 与 `Origin` 校验正常工作。步骤、成本与备份见 [发布部署](./docs/deploy.md)。
+
+```bash
+cp deploy/.env.production.example deploy/.env.prod   # 填域名、数据库密码、模型密钥
+docker compose --env-file deploy/.env.prod -f deploy/compose.prod.yaml up -d --build
+docker compose --env-file deploy/.env.prod -f deploy/compose.prod.yaml exec api node dist/apps/server/admin.js migrate
+```
+
 ## 本地验证
 
 ```bash
@@ -86,6 +96,9 @@ npm run logs:summary -- logs/sessions/你的日志.jsonl
 
 - [产品需求 v0.1](./docs/product-requirements-v0.1.md)
 - [六爻排盘规则 v0.1](./docs/liuyao-chart-rules-v0.1.md)
+- [发布部署](./docs/deploy.md)
+- [网页运行说明](./docs/web-foundation.md)
+- [AI 接入说明](./docs/web-ai.md)
 
 ## 目录
 

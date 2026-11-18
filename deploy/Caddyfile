@@ -1,0 +1,27 @@
+# Production edge: static SPA plus the API on the same origin.
+# SITE_ADDRESS must be a real domain pointing at this host; Caddy obtains and
+# renews the certificate automatically once ports 80/443 are reachable.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+		# index.html must be revalidated so a redeploy never points at stale assets.
+		@document path / /index.html
+		header @document Cache-Control "no-cache"
+		header /assets/* Cache-Control "public, max-age=31536000, immutable"
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
